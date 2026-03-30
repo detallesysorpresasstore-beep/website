@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Detalles y Sorpresas STORE</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración personalizada de Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-orange': '#ff7b54',
+                        'brand-blue': '#4facfe',
+                        'brand-pink': '#ff758c',
+                    },
+                    fontFamily: {
+                        'kids': ['"Fredoka"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Fredoka -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Fredoka', sans-serif; background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased flex h-screen overflow-hidden">
+
+    <!-- Sidebar (Menú Lateral) -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
+        <div class="h-20 flex items-center justify-center border-b border-gray-200">
+            <div class="text-xl font-bold flex flex-col leading-none text-center">
+                <span class="tracking-wide">
+                    <span class="text-brand-orange">PANEL</span> 
+                    <span class="text-brand-pink">ADMIN</span> 
+                </span>
+                <span class="text-brand-blue text-xs uppercase tracking-widest mt-1">D&S Store</span>
+            </div>
+        </div>
+        
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            <a href="#" class="flex items-center gap-3 px-4 py-3 bg-blue-50 text-brand-blue rounded-xl font-medium transition-colors">
+                <i class="ph-fill ph-package text-xl"></i> Productos
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
+                <i class="ph ph-tag text-xl"></i> Categorías
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
+                <i class="ph ph-shopping-bag text-xl"></i> Pedidos
+            </a>
+            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
+                <i class="ph ph-users text-xl"></i> Clientes
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-gray-200">
+            <button class="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg font-medium transition-colors">
+                <i class="ph ph-sign-out text-xl"></i> Cerrar Sesión
+            </button>
+        </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header superior -->
+        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-gray-500 hover:text-brand-orange">
+                    <i class="ph ph-list text-3xl"></i>
+                </button>
+                <h1 class="text-2xl font-bold text-gray-800">Gestión de Productos</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="text-right hidden sm:block">
+                    <p class="text-sm font-bold text-gray-800">Admin</p>
+                    <p class="text-xs text-gray-500">admin@detallesysorpresas.com</p>
+                </div>
+                <div class="h-10 w-10 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold">
+                    A
+                </div>
+            </div>
+        </header>
+
+        <!-- Área de trabajo -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Barra de acciones -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div class="relative w-full sm:w-96">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" placeholder="Buscar productos..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                </div>
+                <button class="w-full sm:w-auto bg-brand-blue text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                    <i class="ph ph-plus-circle text-xl"></i> Nuevo Producto
+                </button>
+            </div>
+
+            <!-- Tabla de productos (Esqueleto) -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
+                                <th class="p-4 font-semibold">Producto</th>
+                                <th class="p-4 font-semibold">Categoría</th>
+                                <th class="p-4 font-semibold">Precio</th>
+                                <th class="p-4 font-semibold">Stock</th>
+                                <th class="p-4 font-semibold text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-products-list" class="divide-y divide-gray-200">
+                            <!-- Aquí inyectaremos los productos con JS más adelante -->
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                                            <i class="ph-duotone ph-image text-xl"></i>
+                                        </div>
+                                        <span class="font-medium text-gray-800">Cargando productos...</span>
+                                    </div>
+                                </td>
+                                <td class="p-4 text-gray-500">...</td>
+                                <td class="p-4 text-gray-500">...</td>
+                                <td class="p-4">
+                                    <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-bold">...</span>
+                                </td>
+                                <td class="p-4 text-center">
+                                    <button class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-lg"></i></button>
+                                    <button class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-lg"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Script de lógica del admin -->
+    <script src="admin.js"></script>
+</body>
+</html>
