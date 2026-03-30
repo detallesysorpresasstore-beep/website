@@ -1,9 +1,21 @@
 /**
- * Detalles y Sorpresas STORE - Lógica del Panel de Administración
+ * Detalles y Sorpresas STORE - Lógica del Panel de Administración (Módulo)
  */
+import { products } from './products.js';
+import { auth, onAuthStateChanged, signOut } from './firebase-config.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    initAdmin();
+    // 1. Proteger la ruta: Verificar si hay un usuario administrador activo
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // El usuario está verificado, inicializamos el panel
+            console.log("Acceso concedido al admin:", user.email);
+            initAdmin();
+        } else {
+            // No hay usuario logueado, lo expulsamos al index
+            window.location.href = 'index.html';
+        }
+    });
 });
 
 function initAdmin() {
@@ -21,17 +33,11 @@ function renderAdminProducts() {
     // Limpiamos el contenido actual
     tbody.innerHTML = '';
 
-    if (typeof products === 'undefined') {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">Error: No se encontró products.js. Asegúrate de enlazarlo.</td></tr>';
-        return;
-    }
-
     // Generamos las filas dinámicamente
     products.forEach(product => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0';
         
-        // Si el usuario no pone un ícono, le damos uno por defecto (una cajita)
         const iconClass = product.imageIcon ? product.imageIcon : 'ph-package';
 
         tr.innerHTML = `
@@ -52,17 +58,25 @@ function renderAdminProducts() {
                 <button class="text-gray-400 hover:text-brand-blue p-1 transition-colors" title="Editar">
                     <i class="ph ph-pencil-simple text-lg"></i>
                 </button>
-                <button class="text-gray-400 hover:text-red-500 p-1 transition-colors" title="Eliminar" onclick="eliminarProductoSimulado('${product.id}')">
+                <button class="text-gray-400 hover:text-red-500 p-1 transition-colors btn-eliminar" data-id="${product.id}" title="Eliminar">
                     <i class="ph ph-trash text-lg"></i>
                 </button>
             </td>
         `;
         tbody.appendChild(tr);
     });
+
+    // Como ahora es un módulo, asignamos los eventos de eliminar de esta forma segura:
+    document.querySelectorAll('.btn-eliminar').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.target.closest('button').getAttribute('data-id');
+            eliminarProductoSimulado(id);
+        });
+    });
 }
 
 /**
- * Configura los eventos del panel (Abrir/Cerrar Modal y Guardar)
+ * Configura los eventos del panel
  */
 function setupEventListeners() {
     const btnNuevoProducto = document.getElementById('btn-nuevo-producto');
@@ -71,20 +85,21 @@ function setupEventListeners() {
     const btnCancelarModal = document.getElementById('btn-cancelar-modal');
     const btnGuardarProducto = document.getElementById('btn-guardar-producto');
     const formProducto = document.getElementById('form-producto');
+    
+    // Seleccionamos el botón de Cerrar Sesión de la barra lateral (el que es de color rojo)
+    const btnCerrarSesion = document.querySelector('aside button.text-red-500');
 
     // Funciones para manejar el modal
     const abrirModal = () => modalProducto.classList.remove('hidden');
     const cerrarModal = () => {
         modalProducto.classList.add('hidden');
-        formProducto.reset(); // Limpiamos los campos al cerrar
+        formProducto.reset(); 
     };
 
-    // Asignamos los eventos de clic a los botones
     if (btnNuevoProducto) btnNuevoProducto.addEventListener('click', abrirModal);
     if (btnCerrarModal) btnCerrarModal.addEventListener('click', cerrarModal);
     if (btnCancelarModal) btnCancelarModal.addEventListener('click', cerrarModal);
 
-    // Evento de guardar
     if (btnGuardarProducto) {
         btnGuardarProducto.addEventListener('click', () => {
             if (guardarNuevoProducto()) {
@@ -92,26 +107,36 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Lógica para cerrar sesión con Firebase
+    if (btnCerrarSesion) {
+        btnCerrarSesion.addEventListener('click', async () => {
+            if(confirm('¿Estás seguro que deseas cerrar la sesión del panel?')) {
+                try {
+                    await signOut(auth);
+                    // No necesitamos redireccionar manualmente aquí, 
+                    // la función 'onAuthStateChanged' de arriba detectará que saliste y te expulsará.
+                } catch (error) {
+                    console.error("Error al cerrar sesión", error);
+                }
+            }
+        });
+    }
 }
 
-/**
- * Captura los datos del formulario, los valida y simula el guardado
- */
 function guardarNuevoProducto() {
     const nombre = document.getElementById('prod-nombre').value;
     const categoria = document.getElementById('prod-categoria').value;
     const precio = parseFloat(document.getElementById('prod-precio').value);
     const imagen = document.getElementById('prod-imagen').value || 'ph-package';
 
-    // Validación simple
     if (!nombre || !categoria || isNaN(precio)) {
         alert('Por favor, completa todos los campos obligatorios (*) con valores válidos.');
-        return false; // Retorna falso para que el modal no se cierre
+        return false; 
     }
 
-    // Creamos el objeto tal como lo espera nuestra tabla
     const nuevoProducto = {
-        id: 'prod_' + Date.now(), // Generamos un ID temporal único
+        id: 'prod_' + Date.now(),
         name: nombre,
         category: categoria,
         price: precio,
@@ -121,26 +146,19 @@ function guardarNuevoProducto() {
         tagColor: "brand-blue"
     };
 
-    // Lo agregamos al principio del array "products"
     products.unshift(nuevoProducto);
-
-    // Volvemos a dibujar la tabla
     renderAdminProducts();
     
-    // Mostramos un mensajito temporal
     alert('¡Producto agregado con éxito! (Simulación local)');
-    return true; // Retorna verdadero para cerrar el modal
+    return true; 
 }
 
-/**
- * Función temporal para simular la eliminación de un producto
- */
 function eliminarProductoSimulado(id) {
     if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
         const indice = products.findIndex(p => p.id === id);
         if (indice !== -1) {
-            products.splice(indice, 1); // Lo borramos del array
-            renderAdminProducts(); // Redibujamos la tabla
+            products.splice(indice, 1);
+            renderAdminProducts(); 
         }
     }
 }
