@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalles y Sorpresas STORE | Ropa y Juguetes</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración personalizada de Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-orange': '#ff7b54',
+                        'brand-blue': '#4facfe',
+                        'brand-pink': '#ff758c',
+                        'brand-yellow': '#fcd34d',
+                    },
+                    fontFamily: {
+                        'kids': ['"Fredoka"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Fredoka -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons para íconos ligeros y modernos -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Fredoka', sans-serif; }
+        .hero-bg {
+            background: linear-gradient(135deg, #fff5eb 0%, #f0f9ff 100%);
+        }
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased flex flex-col min-h-screen">
+
+    <!-- Navegación -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Logo -->
+                <div class="flex-shrink-0 flex items-center cursor-pointer">
+                    <div class="text-2xl font-bold flex flex-col leading-none text-center">
+                        <span class="tracking-wide">
+                            <i class="ph-fill ph-star text-brand-yellow text-xl"></i>
+                            <span class="text-brand-orange">DETALLES</span> 
+                            <span class="text-brand-pink">Y</span> 
+                            <i class="ph-fill ph-heart text-brand-pink text-xl"></i>
+                        </span>
+                        <span class="text-brand-blue tracking-wide">SORPRESAS</span>
+                        <span class="text-brand-blue text-xs uppercase tracking-widest mt-1">Store</span>
+                    </div>
+                </div>
+
+                <!-- Menú Desktop -->
+                <nav class="hidden md:flex space-x-8">
+                    <a href="#" class="text-gray-600 hover:text-brand-orange font-medium transition-colors">Inicio</a>
+                    <a href="#categorias" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Categorías</a>
+                    <a href="#destacados" class="text-gray-600 hover:text-brand-pink font-medium transition-colors">Novedades</a>
+                    <a href="#" class="text-gray-600 hover:text-brand-orange font-medium transition-colors">Nosotros</a>
+                </nav>
+
+                <!-- Iconos de Acción -->
+                <div class="flex items-center space-x-4">
+                    <button class="text-gray-600 hover:text-brand-blue transition-colors">
+                        <i class="ph ph-magnifying-glass text-2xl"></i>
+                    </button>
+                    <button class="text-gray-600 hover:text-brand-orange transition-colors hidden sm:block">
+                        <i class="ph ph-user text-2xl"></i>
+                    </button>
+                    <button class="text-gray-600 hover:text-brand-pink transition-colors relative">
+                        <i class="ph ph-shopping-cart text-2xl"></i>
+                        <span class="absolute -top-1 -right-1 bg-brand-orange text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">0</span>
+                    </button>
+                    <!-- Menú Móvil Botón -->
+                    <button id="mobile-menu-btn" class="md:hidden text-gray-600 hover:text-brand-orange transition-colors">
+                        <i class="ph ph-list text-3xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menú Móvil Desplegable -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-orange hover:bg-orange-50 rounded-md">Inicio</a>
+                <a href="#categorias" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Categorías</a>
+                <a href="#destacados" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-pink hover:bg-pink-50 rounded-md">Novedades</a>
+                <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-orange hover:bg-orange-50 rounded-md">Nosotros</a>
+                <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Mi Cuenta</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <main class="flex-grow">
+        <section class="hero-bg py-16 sm:py-24">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 text-center md:text-left mb-10 md:mb-0">
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-800 leading-tight mb-4">
+                        Ropa para niños <br>
+                        <span class="text-brand-blue">&</span> <span class="text-brand-pink">Juguetes mágicos</span>
+                    </h1>
+                    <p class="text-lg text-gray-600 mb-8 max-w-xl mx-auto md:mx-0">
+                        Descubre nuestra increíble colección llena de color, diversión y comodidad. ¡Haz que cada día sea una aventura para los más pequeños!
+                    </p>
+                    <a href="#destacados" class="inline-block bg-white text-brand-orange font-bold text-lg py-3 px-8 rounded-full border-2 border-brand-orange shadow-lg hover:bg-brand-orange hover:text-white transition-all duration-300 transform hover:scale-105">
+                        ¡COMPRA AHORA!
+                    </a>
+                </div>
+                <div class="md:w-1/2 flex justify-center">
+                    <!-- Placeholder de la imagen principal. En producción usaríamos la foto de los niños jugando -->
+                    <div class="relative w-full max-w-md aspect-video bg-white rounded-3xl shadow-xl overflow-hidden border-4 border-white flex items-center justify-center">
+                        <div class="text-center p-6 text-gray-400">
+                            <i class="ph-duotone ph-image text-6xl mb-2 text-brand-blue"></i>
+                            <p>[Imagen de Niños Jugando]</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Categorías (Inspirado en Imagen 1) -->
+        <section id="categorias" class="py-16 bg-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">Explora por <span class="text-brand-orange">Categorías</span></h2>
+                    <div class="w-24 h-1 bg-brand-yellow mx-auto rounded-full"></div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 text-center">
+                    <!-- Item Categoría -->
+                    <a href="#" class="category-card block p-6 bg-blue-50 rounded-3xl transition-all duration-300 border border-blue-100">
+                        <div class="text-5xl mb-3">👕</div>
+                        <h3 class="font-semibold text-gray-700">Ropa Niños</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-pink-50 rounded-3xl transition-all duration-300 border border-pink-100">
+                        <div class="text-5xl mb-3">👗</div>
+                        <h3 class="font-semibold text-gray-700">Ropa Niñas</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-orange-50 rounded-3xl transition-all duration-300 border border-orange-100">
+                        <div class="text-5xl mb-3">🌙</div>
+                        <h3 class="font-semibold text-gray-700">Pijamas Niños</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-purple-50 rounded-3xl transition-all duration-300 border border-purple-100">
+                        <div class="text-5xl mb-3">🧸</div>
+                        <h3 class="font-semibold text-gray-700">Pijamas Niñas</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-green-50 rounded-3xl transition-all duration-300 border border-green-100">
+                        <div class="text-5xl mb-3">🚂</div>
+                        <h3 class="font-semibold text-gray-700">Juguetes Niños</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-red-50 rounded-3xl transition-all duration-300 border border-red-100">
+                        <div class="text-5xl mb-3">🏠</div>
+                        <h3 class="font-semibold text-gray-700">Juguetes Niñas</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-yellow-50 rounded-3xl transition-all duration-300 border border-yellow-100">
+                        <div class="text-5xl mb-3">⚽</div>
+                        <h3 class="font-semibold text-gray-700">Juguetes Todos</h3>
+                    </a>
+                    <a href="#" class="category-card block p-6 bg-teal-50 rounded-3xl transition-all duration-300 border border-teal-100">
+                        <div class="text-5xl mb-3">🐰</div>
+                        <h3 class="font-semibold text-gray-700">Peluches</h3>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Productos Destacados -->
+        <section id="destacados" class="py-16 bg-gray-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-end mb-10">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Lo Más <span class="text-brand-pink">Nuevo</span></h2>
+                        <div class="w-24 h-1 bg-brand-blue rounded-full"></div>
+                    </div>
+                    <a href="#" class="hidden sm:block text-brand-orange font-medium hover:underline">Ver todo &rarr;</a>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Tarjeta de Producto 1 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+                        <div class="relative h-64 bg-gray-100 flex items-center justify-center p-4">
+                            <!-- Placeholder Imagen -->
+                            <i class="ph-duotone ph-t-shirt text-6xl text-gray-300"></i>
+                            <div class="absolute top-3 left-3 bg-brand-yellow text-xs font-bold px-2 py-1 rounded text-gray-800">NUEVO</div>
+                            
+                            <!-- Overlay Hover -->
+                            <div class="absolute inset-0 bg-black bg-opacity-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                <button class="bg-white text-brand-blue rounded-full p-3 shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-blue hover:text-white">
+                                    <i class="ph-bold ph-shopping-cart text-xl"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-5">
+                            <p class="text-xs text-brand-orange font-bold uppercase tracking-wider mb-1">Ropa Niños</p>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate">Suéter Dinosaurio Azul</h3>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl font-bold text-gray-800">$24.99</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Producto 2 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+                        <div class="relative h-64 bg-gray-100 flex items-center justify-center p-4">
+                            <i class="ph-duotone ph-dress text-6xl text-gray-300"></i>
+                        </div>
+                        <div class="p-5">
+                            <p class="text-xs text-brand-pink font-bold uppercase tracking-wider mb-1">Ropa Niñas</p>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate">Vestido Flores Primavera</h3>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl font-bold text-gray-800">$29.99</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Producto 3 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+                        <div class="relative h-64 bg-gray-100 flex items-center justify-center p-4">
+                            <i class="ph-duotone ph-train text-6xl text-gray-300"></i>
+                        </div>
+                        <div class="p-5">
+                            <p class="text-xs text-brand-blue font-bold uppercase tracking-wider mb-1">Juguetes</p>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate">Tren de Madera</h3>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl font-bold text-gray-800">$19.50</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Producto 4 -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+                        <div class="relative h-64 bg-gray-100 flex items-center justify-center p-4">
+                            <i class="ph-duotone ph-teddy-bear text-6xl text-gray-300"></i>
+                            <div class="absolute top-3 left-3 bg-brand-pink text-white text-xs font-bold px-2 py-1 rounded">-15%</div>
+                        </div>
+                        <div class="p-5">
+                            <p class="text-xs text-brand-orange font-bold uppercase tracking-wider mb-1">Peluches</p>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate">Osito Clásico</h3>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl font-bold text-brand-pink">$15.99</span>
+                                    <span class="text-sm text-gray-400 line-through">$18.99</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 text-center sm:hidden">
+                    <a href="#" class="inline-block bg-white text-gray-700 font-medium py-2 px-6 rounded-full border border-gray-300 hover:bg-gray-50">Ver todo</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 pt-12 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="text-2xl font-bold flex flex-col leading-none mb-4">
+                        <span class="tracking-wide">
+                            <span class="text-brand-orange">DETALLES</span> <span class="text-brand-pink">Y</span> 
+                        </span>
+                        <span class="text-brand-blue tracking-wide">SORPRESAS</span>
+                    </div>
+                    <p class="text-gray-500 mb-4 max-w-sm">
+                        La tienda favorita de los niños. Ofrecemos ropa cómoda y juguetes increíbles para crear momentos inolvidables.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-brand-blue"><i class="ph-fill ph-facebook-logo text-2xl"></i></a>
+                        <a href="#" class="text-gray-400 hover:text-brand-pink"><i class="ph-fill ph-instagram-logo text-2xl"></i></a>
+                        <a href="#" class="text-gray-400 hover:text-brand-blue"><i class="ph-fill ph-twitter-logo text-2xl"></i></a>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="font-bold text-gray-800 mb-4 uppercase text-sm tracking-wider">Enlaces Rápidos</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Inicio</a></li>
+                        <li><a href="#categorias" class="text-gray-500 hover:text-brand-orange transition-colors">Categorías</a></li>
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Sobre Nosotros</a></li>
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Contacto</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold text-gray-800 mb-4 uppercase text-sm tracking-wider">Ayuda</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Envíos y Entregas</a></li>
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Devoluciones</a></li>
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">Guía de Tallas</a></li>
+                        <li><a href="#" class="text-gray-500 hover:text-brand-orange transition-colors">FAQ</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center">
+                <p class="text-gray-400 text-sm text-center md:text-left">
+                    &copy; 2026 Detalles y Sorpresas Store. Todos los derechos reservados.
+                </p>
+                <div class="flex space-x-4 mt-4 md:mt-0">
+                    <i class="ph ph-credit-card text-2xl text-gray-300"></i>
+                    <i class="ph ph-paypal-logo text-2xl text-gray-300"></i>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script para interactividad básica (Menú móvil) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('mobile-menu-btn');
+            const menu = document.getElementById('mobile-menu');
+
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
