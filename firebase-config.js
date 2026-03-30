@@ -2,15 +2,15 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// ⚠️ IMPORTANTE: Reemplaza el contenido de este objeto con tu propia configuración.
-// Puedes encontrarla en tu Consola de Firebase -> Configuración del proyecto -> Tus aplicaciones (Web)
+// Tu configuración web de Firebase
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyDs83zqJo_JkRgCrApVwMQR3MxjrtPYltI",
+  authDomain: "detalles-y-sorpresas-store.firebaseapp.com",
+  projectId: "detalles-y-sorpresas-store",
+  storageBucket: "detalles-y-sorpresas-store.firebasestorage.app",
+  messagingSenderId: "853458086140",
+  appId: "1:853458086140:web:a7c422eef3b8de7ff84f79",
+  measurementId: "G-M816B3BWMQ"
 };
 
 // Inicializar Firebase
