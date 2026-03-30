@@ -1,14 +1,12 @@
 /**
- * Detalles y Sorpresas STORE - Archivo Principal JS
+ * Detalles y Sorpresas STORE - Archivo Principal JS (Módulo Seguro)
  */
 
-import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
-// Importamos la función para registrar nuevos usuarios directamente de Firebase
+import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Correos que tienen permisos de Administrador
-const ADMIN_EMAILS = ['detallesysorpresasstore@gmail.com', 'admin@tienda.com', 'admin@detalles.com'];
-
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'detalles-y-sorpresas-store';
 let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,7 +20,7 @@ function initApp() {
 }
 
 /**
- * Escucha los cambios de sesión (Si alguien se loguea o desloguea)
+ * Escucha los cambios de sesión para actualizar la UI
  */
 function monitorAuthState() {
     const btnLogin = document.getElementById('btn-abrir-login');
@@ -30,17 +28,14 @@ function monitorAuthState() {
 
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
-        
         if (user) {
-            console.log('Usuario activo:', user.email);
-            // Cambiamos el color del ícono para indicar que está logueado
+            // Usuario logueado: Ícono resaltado
             if (btnLoginIcon) {
                 btnLoginIcon.classList.remove('text-gray-600', 'ph');
                 btnLoginIcon.classList.add('text-brand-orange', 'ph-fill');
             }
         } else {
-            console.log('No hay usuario activo.');
-            // Restauramos el ícono normal
+            // Usuario desconectado: Ícono normal
             if (btnLoginIcon) {
                 btnLoginIcon.classList.remove('text-brand-orange', 'ph-fill');
                 btnLoginIcon.classList.add('text-gray-600', 'ph');
@@ -50,7 +45,7 @@ function monitorAuthState() {
 }
 
 /**
- * Configura la interactividad del menú móvil
+ * Control del menú de navegación móvil
  */
 function setupMobileMenu() {
     const btn = document.getElementById('mobile-menu-btn');
@@ -64,7 +59,7 @@ function setupMobileMenu() {
 }
 
 /**
- * Configura la interactividad del Modal de Usuarios (Login / Registro)
+ * Lógica del Modal de Autenticación (Login y Registro)
  */
 function setupLoginModal() {
     const modal = document.getElementById('modal-login');
@@ -72,141 +67,132 @@ function setupLoginModal() {
     const btnAbrirMovil = document.getElementById('btn-abrir-login-movil');
     const btnCerrar = document.getElementById('btn-cerrar-login');
     
-    // Elementos del formulario
     const formLogin = document.getElementById('form-login');
     const divNombre = document.getElementById('div-nombre');
-    const passHint = document.getElementById('password-hint');
     const loginError = document.getElementById('login-error');
     const loginSuccess = document.getElementById('login-success');
     const btnSubmit = document.getElementById('btn-submit-login');
     
-    // Elementos para alternar modo
     const btnToggleMode = document.getElementById('btn-toggle-mode');
     const toggleText = document.getElementById('toggle-text');
     const modalTitle = document.getElementById('modal-title');
 
-    let isLoginMode = true; // Por defecto empezamos en modo Iniciar Sesión
+    let isLoginMode = true;
 
-    // Función para abrir el modal (o preguntar si quiere cerrar sesión)
     const handleOpenModal = () => {
         if (currentUser) {
-            // Si ya hay alguien logueado, le preguntamos si quiere salir
-            if (confirm(`Sesión iniciada como: ${currentUser.email}\n¿Deseas cerrar tu sesión?`)) {
-                signOut(auth).then(() => {
-                    alert('Sesión cerrada correctamente.');
-                    window.location.reload();
-                });
+            // Si ya hay sesión, ofrecer cerrar sesión directamente
+            const confirmLogout = confirm(`Sesión activa: ${currentUser.email}\n¿Deseas cerrar sesión?`);
+            if (confirmLogout) {
+                signOut(auth).then(() => window.location.reload());
             }
         } else {
-            // Si no hay nadie logueado, abrimos el modal
             modal.classList.remove('hidden');
             loginError.classList.add('hidden');
             loginSuccess.classList.add('hidden');
         }
     };
 
-    const cerrarModal = () => {
-        modal.classList.add('hidden');
-        formLogin.reset(); 
-    };
-
-    // Alternar entre Iniciar Sesión y Registro
     const toggleMode = () => {
         isLoginMode = !isLoginMode;
         loginError.classList.add('hidden');
         loginSuccess.classList.add('hidden');
 
         if (isLoginMode) {
-            // Diseño de Iniciar Sesión
             modalTitle.innerHTML = '<i class="ph-fill ph-user-circle text-brand-blue text-2xl"></i> Mi Cuenta';
             divNombre.classList.add('hidden');
-            passHint.classList.add('hidden');
             btnSubmit.innerHTML = '<span>Ingresar</span>';
             toggleText.textContent = '¿No tienes cuenta?';
             btnToggleMode.textContent = 'Regístrate aquí';
         } else {
-            // Diseño de Registro
             modalTitle.innerHTML = '<i class="ph-fill ph-user-plus text-brand-orange text-2xl"></i> Crear Cuenta';
             divNombre.classList.remove('hidden');
-            passHint.classList.remove('hidden');
             btnSubmit.innerHTML = '<span>Registrarse</span>';
             toggleText.textContent = '¿Ya tienes cuenta?';
             btnToggleMode.textContent = 'Inicia sesión';
         }
     };
 
-    // Asignar eventos
     if (btnAbrir) btnAbrir.addEventListener('click', handleOpenModal);
-    if (btnAbrirMovil) btnAbrirMovil.addEventListener('click', () => {
-        document.getElementById('mobile-menu').classList.add('hidden');
-        handleOpenModal();
-    });
-    if (btnCerrar) btnCerrar.addEventListener('click', cerrarModal);
+    if (btnAbrirMovil) btnAbrirMovil.addEventListener('click', handleOpenModal);
+    if (btnCerrar) btnCerrar.addEventListener('click', () => modal.classList.add('hidden'));
     if (btnToggleMode) btnToggleMode.addEventListener('click', toggleMode);
 
-    // Procesar el formulario con Firebase
     if (formLogin) {
         formLogin.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const email = document.getElementById('login-email').value;
+            const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
+            const name = document.getElementById('login-name').value.trim();
 
-            // Cambiamos el estado del botón a "Cargando"
-            const originalText = btnSubmit.innerHTML;
-            btnSubmit.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Procesando...';
             btnSubmit.disabled = true;
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Procesando...';
             loginError.classList.add('hidden');
-            loginSuccess.classList.add('hidden');
 
             try {
                 let userCredential;
 
                 if (isLoginMode) {
-                    // Acción: Iniciar Sesión
+                    // INICIO DE SESIÓN
                     userCredential = await signInWithEmailAndPassword(auth, email, password);
                 } else {
-                    // Acción: Registrarse
+                    // REGISTRO DE NUEVO USUARIO
                     userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    
+                    // CREACIÓN AUTOMÁTICA EN FIRESTORE (Rol por defecto: 'user')
+                    // Path: /artifacts/{appId}/public/data/users/{uid}
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCredential.user.uid), {
+                        uid: userCredential.user.uid,
+                        email: email,
+                        name: name || 'Usuario',
+                        role: 'user', // <--- Tú podrás cambiar esto a 'admin' en la consola
+                        createdAt: new Date().toISOString()
+                    });
                 }
-                
-                // VERIFICACIÓN: ¿Es un usuario normal o un Administrador?
-                const userEmail = userCredential.user.email.toLowerCase();
-                
-                if (ADMIN_EMAILS.includes(userEmail)) {
-                    // Es un administrador -> Lo mandamos al panel
+
+                // VERIFICACIÓN DE ROL: Consultamos Firestore para ver a dónde enviar al usuario
+                const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', userCredential.user.uid);
+                const userSnap = await getDoc(userRef);
+
+                if (userSnap.exists() && userSnap.data().role === 'admin') {
+                    // Es Administrador: Redirigir al panel
                     window.location.href = 'admin.html';
                 } else {
-                    // Es un cliente normal -> Lo dejamos en la tienda y damos bienvenida
+                    // Es Cliente: Mostrar éxito y recargar la tienda
                     loginSuccess.classList.remove('hidden');
-                    loginSuccess.textContent = isLoginMode ? '¡Sesión iniciada con éxito!' : '¡Cuenta creada con éxito!';
+                    loginSuccess.textContent = isLoginMode ? '¡Bienvenido de nuevo!' : '¡Cuenta creada con éxito!';
                     
                     setTimeout(() => {
-                        cerrarModal();
-                        alert(`¡Hola! Bienvenido/a a Detalles y Sorpresas STORE.`);
-                        // Al recargar la página, se aplicarán los estilos de "Logueado" en el botón
-                        window.location.reload(); 
+                        modal.classList.add('hidden');
+                        window.location.reload();
                     }, 1000);
                 }
-                
+
             } catch (error) {
-                console.error('Error de autenticación:', error.code, error.message);
+                console.error("Error Auth/Firestore:", error);
                 loginError.classList.remove('hidden');
                 
-                // Manejo de errores comunes para el usuario
-                if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-                    loginError.textContent = 'Usuario o contraseña incorrectos.';
-                } else if (error.code === 'auth/email-already-in-use') {
-                    loginError.textContent = 'Este correo ya está registrado.';
-                } else if (error.code === 'auth/weak-password') {
-                    loginError.textContent = 'La contraseña debe tener al menos 6 caracteres.';
-                } else {
-                    loginError.textContent = 'Ocurrió un error. Intenta de nuevo.';
+                // Traducción de errores comunes de Firebase
+                switch (error.code) {
+                    case 'auth/wrong-password':
+                    case 'auth/user-not-found':
+                    case 'auth/invalid-credential':
+                        loginError.textContent = 'Correo o contraseña incorrectos.';
+                        break;
+                    case 'auth/email-already-in-use':
+                        loginError.textContent = 'Este correo ya está registrado.';
+                        break;
+                    case 'auth/weak-password':
+                        loginError.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+                        break;
+                    default:
+                        loginError.textContent = 'Ocurrió un problema técnico. Intenta más tarde.';
                 }
             } finally {
-                // Restauramos el botón
-                btnSubmit.innerHTML = originalText;
                 btnSubmit.disabled = false;
+                btnSubmit.innerHTML = originalText;
             }
         });
     }
