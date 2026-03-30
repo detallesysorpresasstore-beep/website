@@ -103,7 +103,7 @@
                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                     <input type="text" placeholder="Buscar productos..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
                 </div>
-                <button class="w-full sm:w-auto bg-brand-blue text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <button id="btn-nuevo-producto" class="w-full sm:w-auto bg-brand-blue text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
                     <i class="ph ph-plus-circle text-xl"></i> Nuevo Producto
                 </button>
             </div>
@@ -122,7 +122,7 @@
                             </tr>
                         </thead>
                         <tbody id="admin-products-list" class="divide-y divide-gray-200">
-                            <!-- Aquí inyectaremos los productos con JS más adelante -->
+                            <!-- Aquí inyectaremos los productos con JS -->
                             <tr class="hover:bg-gray-50 transition-colors">
                                 <td class="p-4">
                                     <div class="flex items-center gap-3">
@@ -149,7 +149,8 @@
         </div>
     </main>
 
-    <!-- Script de lógica del admin -->
+    <!-- Scripts de la aplicación (El orden es importante) -->
+    <script src="products.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>
