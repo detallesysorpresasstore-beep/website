@@ -41,7 +41,7 @@
 <body class="text-gray-800 antialiased flex h-screen overflow-hidden">
 
     <!-- Sidebar (Menú Lateral) -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex z-10">
         <div class="h-20 flex items-center justify-center border-b border-gray-200">
             <div class="text-xl font-bold flex flex-col leading-none text-center">
                 <span class="tracking-wide">
@@ -75,9 +75,9 @@
     </aside>
 
     <!-- Contenido Principal -->
-    <main class="flex-1 flex flex-col overflow-hidden">
+    <main class="flex-1 flex flex-col overflow-hidden relative">
         <!-- Header superior -->
-        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10">
             <div class="flex items-center gap-4">
                 <button class="md:hidden text-gray-500 hover:text-brand-orange">
                     <i class="ph ph-list text-3xl"></i>
@@ -87,16 +87,16 @@
             <div class="flex items-center gap-3">
                 <div class="text-right hidden sm:block">
                     <p class="text-sm font-bold text-gray-800">Admin</p>
-                    <p class="text-xs text-gray-500">admin@detallesysorpresas.com</p>
+                    <p class="text-xs text-gray-500">Administrador de Tienda</p>
                 </div>
-                <div class="h-10 w-10 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold">
+                <div class="h-10 w-10 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold cursor-pointer">
                     A
                 </div>
             </div>
         </header>
 
         <!-- Área de trabajo -->
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex-1 overflow-y-auto p-6 z-0">
             <!-- Barra de acciones -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div class="relative w-full sm:w-96">
@@ -108,49 +108,82 @@
                 </button>
             </div>
 
-            <!-- Tabla de productos (Esqueleto) -->
+            <!-- Tabla de productos -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
                                 <th class="p-4 font-semibold">Producto</th>
-                                <th class="p-4 font-semibold">Categoría</th>
+                                <th class="p-4 font-semibold hidden sm:table-cell">Categoría</th>
                                 <th class="p-4 font-semibold">Precio</th>
-                                <th class="p-4 font-semibold">Stock</th>
+                                <th class="p-4 font-semibold hidden md:table-cell">Stock</th>
                                 <th class="p-4 font-semibold text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="admin-products-list" class="divide-y divide-gray-200">
-                            <!-- Aquí inyectaremos los productos con JS -->
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="p-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
-                                            <i class="ph-duotone ph-image text-xl"></i>
-                                        </div>
-                                        <span class="font-medium text-gray-800">Cargando productos...</span>
-                                    </div>
-                                </td>
-                                <td class="p-4 text-gray-500">...</td>
-                                <td class="p-4 text-gray-500">...</td>
-                                <td class="p-4">
-                                    <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-bold">...</span>
-                                </td>
-                                <td class="p-4 text-center">
-                                    <button class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-lg"></i></button>
-                                    <button class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-lg"></i></button>
-                                </td>
-                            </tr>
+                            <!-- Aquí inyectaremos los productos con JS desde Firestore -->
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
+        <!-- MODAL: Nuevo Producto -->
+        <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-full">
+                <!-- Header del Modal -->
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-800">Añadir Nuevo Producto</h3>
+                    <button id="btn-cerrar-modal" class="text-gray-400 hover:text-red-500 transition-colors">
+                        <i class="ph ph-x text-2xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Cuerpo del Formulario -->
+                <div class="p-6 overflow-y-auto">
+                    <form id="form-producto" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto *</label>
+                            <input type="text" id="prod-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
+                                <select id="prod-categoria" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Ropa Niños">Ropa Niños</option>
+                                    <option value="Ropa Niñas">Ropa Niñas</option>
+                                    <option value="Pijamas Niños">Pijamas Niños</option>
+                                    <option value="Pijamas Niñas">Pijamas Niñas</option>
+                                    <option value="Juguetes">Juguetes</option>
+                                    <option value="Peluches">Peluches</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Precio ($) *</label>
+                                <input type="number" step="0.01" id="prod-precio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Imagen (Clase de ícono)</label>
+                            <input type="text" id="prod-imagen" placeholder="Ej: ph-teddy-bear" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-gray-500">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Footer del Modal -->
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                    <button id="btn-cancelar-modal" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+                    <button id="btn-guardar-producto" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg transition-colors shadow-sm">Guardar Producto</button>
+                </div>
+            </div>
+        </div>
     </main>
 
-    <!-- Scripts de la aplicación (El orden es importante) -->
-    <script src="products.js"></script>
-    <script src="admin.js"></script>
+    <!-- Script principal como MÓDULO (Esto soluciona los errores de consola) -->
+    <script type="module" src="admin.js"></script>
 </body>
 </html>
