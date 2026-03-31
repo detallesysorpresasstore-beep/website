@@ -31,7 +31,7 @@ const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
-const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users"); // Tu ruta de usuarios
+const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users");
 
 // Variables Globales
 let productosGlobales = [];
@@ -45,8 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarSeguridad();
     configurarEventos();
     
-    // Cargar toda la data al iniciar
-    cargarCategorias(); // Cargar primero para llenar el select de productos
+    cargarCategorias();
     cargarProductos();
     cargarPedidos();
     cargarClientes();
@@ -59,7 +58,6 @@ function verificarSeguridad() {
 }
 
 function configurarEventos() {
-    // ---- LOGOUT (CORREGIDO) ----
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
             if (confirm("¿Seguro que deseas cerrar sesión?")) {
@@ -116,7 +114,6 @@ async function cargarCategorias() {
             const cat = docSnap.data();
             const id = docSnap.id;
 
-            // 1. Llenar la tabla de administración
             tbody.innerHTML += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${cat.nombre}</td>
@@ -128,8 +125,6 @@ async function cargarCategorias() {
                     </td>
                 </tr>
             `;
-
-            // 2. Llenar automáticamente el <select> en el modal de nuevo producto
             selectProd.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
         });
     } catch (error) {
@@ -149,7 +144,7 @@ async function guardarCategoria() {
     try {
         await addDoc(categoriesCollection, { nombre, icono });
         modalCategoria.classList.add('hidden');
-        cargarCategorias(); // Recargar tabla y select
+        cargarCategorias(); 
     } catch (error) {
         console.error("Error al guardar categoría:", error);
         alert("Hubo un error.");
@@ -167,9 +162,8 @@ window.eliminarCategoria = async (id) => {
 };
 
 // ==========================================
-// MÓDULO: PRODUCTOS (IMGBB Y FIRESTORE)
+// MÓDULO: PRODUCTOS 
 // ==========================================
-// (Misma lógica que verificamos anteriormente, integrada aquí)
 
 async function manejarSubidaMultiplesImagenes(event) {
     const files = event.target.files;
@@ -229,16 +223,29 @@ async function guardarProducto() {
     const nombre = document.getElementById('prod-nombre').value.trim();
     const categoria = document.getElementById('prod-categoria').value;
     const precio = parseFloat(document.getElementById('prod-precio').value);
+    
+    // NUEVO: Capturar descripción
+    const descripcion = document.getElementById('prod-descripcion').value.trim();
 
     if (!nombre || !categoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
-        return alert("Completa los datos y sube al menos una foto.");
+        return alert("Completa los datos obligatorios y sube al menos una foto.");
     }
 
     btnGuardarProducto.disabled = true;
     btnGuardarProducto.innerText = "Guardando...";
 
     try {
-        const datos = { nombre, categoria, precio, imagenes: arrayImagenesUrls, stock: 10, fechaActualizacion: new Date().toISOString() };
+        // NUEVO: Añadir la descripción al objeto de datos
+        const datos = { 
+            nombre, 
+            categoria, 
+            precio, 
+            descripcion, // Se guarda en Firestore
+            imagenes: arrayImagenesUrls, 
+            stock: 10, 
+            fechaActualizacion: new Date().toISOString() 
+        };
+        
         if (id) {
             await updateDoc(doc(db, "products", id), datos);
         } else {
@@ -294,6 +301,10 @@ async function cargarProductos() {
 function resetearModalProducto(titulo) {
     document.getElementById('form-producto').reset();
     document.getElementById('prod-id').value = '';
+    
+    // NUEVO: Limpiar descripción
+    document.getElementById('prod-descripcion').value = '';
+    
     arrayImagenesUrls = [];
     renderizarGaleria();
     document.getElementById('modal-titulo').innerText = titulo;
@@ -302,11 +313,16 @@ function resetearModalProducto(titulo) {
 window.prepararEdicionProd = (id) => {
     const prod = productosGlobales.find(p => p.id === id);
     if (!prod) return;
+    
     resetearModalProducto("Editar Producto");
     document.getElementById('prod-id').value = prod.id;
     document.getElementById('prod-nombre').value = prod.nombre;
     document.getElementById('prod-categoria').value = prod.categoria;
     document.getElementById('prod-precio').value = prod.precio;
+    
+    // NUEVO: Cargar la descripción si existe
+    document.getElementById('prod-descripcion').value = prod.descripcion || '';
+    
     arrayImagenesUrls = [...prod.imagenes];
     renderizarGaleria();
     modalProducto.classList.remove('hidden');
@@ -374,7 +390,6 @@ async function cargarPedidos() {
             const pedido = docSnap.data();
             const id = docSnap.id;
             
-            // Colores dinámicos para el estado
             let colorEstado = 'bg-gray-100 text-gray-600';
             if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700';
             if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700';
@@ -397,7 +412,7 @@ async function cargarPedidos() {
             `;
         });
     } catch (error) {
-        console.log("No hay colección de pedidos aún, o no hay permisos. Todo en orden.");
+        console.log("No hay pedidos.");
     }
 }
 
