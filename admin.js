@@ -18,6 +18,7 @@ const modalProducto = document.getElementById('modal-producto');
 const btnNuevoProducto = document.getElementById('btn-nuevo-producto');
 const btnGuardarProducto = document.getElementById('btn-guardar-producto');
 const btnExportarProductos = document.getElementById('btn-exportar-productos');
+const selectProdCategoria = document.getElementById('prod-categoria');
 
 // Filtros de Productos
 const buscadorProductos = document.getElementById('buscador-productos');
@@ -44,7 +45,8 @@ const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/pub
 
 // Variables Globales
 let productosGlobales = [];
-let productosFiltrados = []; // NUEVO: Para la tabla y exportación con filtros
+let productosFiltrados = [];
+let categoriasGlobales = []; // NUEVO: Para guardar la relación padre-hijo
 let clientesGlobales = []; 
 let arrayImagenesUrls = [];
 
@@ -56,8 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarSeguridad();
     configurarEventos();
     
-    cargarCategorias();
-    cargarProductos();
+    // Es crítico cargar categorías primero para establecer las relaciones
+    cargarCategorias().then(() => {
+        cargarProductos();
+    });
+    
     cargarPedidos();
     cargarClientes();
 });
@@ -87,10 +92,14 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('prod-imagen').addEventListener('change', manejarSubidaMultiplesImagenes);
     btnGuardarProducto.addEventListener('click', guardarProducto);
-    
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
 
-    // NUEVO: Eventos de Filtros
+    // NUEVO: Escuchar el cambio de categoría en el formulario de producto
+    selectProdCategoria.addEventListener('change', (e) => {
+        actualizarSelectSubcategoriasFormulario(e.target.value);
+    });
+
+    // Filtros
     buscadorProductos.addEventListener('input', aplicarFiltrosProductos);
     filtroCategoria.addEventListener('change', () => {
         actualizarSelectSubcategoriasFiltro();
@@ -107,50 +116,55 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
 
-    // ---- EVENTOS PEDIDOS ----
+    // ---- EVENTOS PEDIDOS / CLIENTES ----
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
-
-    // ---- EVENTOS CLIENTES ----
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
 }
 
 // ==========================================
-// MÓDULO: CATEGORÍAS
+// MÓDULO: CATEGORÍAS (JERARQUÍA ESTRICTA)
 // ==========================================
 
 async function cargarCategorias() {
     const tbody = document.getElementById('admin-categories-list');
-    const selectProd = document.getElementById('prod-categoria');
     
     try {
         const querySnapshot = await getDocs(categoriesCollection);
         tbody.innerHTML = '';
-        selectProd.innerHTML = '<option value="">Seleccionar categoría...</option>';
-        filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>'; // Actualiza el filtro también
+        selectProdCategoria.innerHTML = '<option value="">Seleccionar categoría...</option>';
+        filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
+        categoriasGlobales = []; // Limpiamos caché de categorías
 
         if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">No hay categorías. Crea una.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No hay categorías. Crea una.</td></tr>';
             return;
         }
 
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
-            const id = docSnap.id;
+            cat.id = docSnap.id;
+            categoriasGlobales.push(cat); // Guardamos la jerarquía en memoria
+
+            // Formatear las subcategorías para la tabla
+            const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) 
+                ? cat.subcategorias.join(', ') 
+                : '<span class="text-gray-400 italic">Sin subcategorías</span>';
 
             tbody.innerHTML += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${cat.nombre}</td>
+                    <td class="p-4 text-gray-600 text-sm">${subcatsTexto}</td>
                     <td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td>
                     <td class="p-4 text-center">
-                        <button onclick="eliminarCategoria('${id}')" class="text-gray-400 hover:text-red-500 p-1">
+                        <button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1">
                             <i class="ph ph-trash text-xl"></i>
                         </button>
                     </td>
                 </tr>
             `;
-            selectProd.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
+            selectProdCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
             filtroCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
         });
     } catch (error) {
@@ -161,19 +175,25 @@ async function cargarCategorias() {
 async function guardarCategoria() {
     const nombre = document.getElementById('cat-nombre').value.trim();
     const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
+    const subcatsRaw = document.getElementById('cat-subcategorias').value;
 
-    if (!nombre) return alert("El nombre es obligatorio.");
+    if (!nombre || !subcatsRaw) return alert("El nombre y las subcategorías son obligatorios.");
+
+    // Convertir el texto separado por comas en un Array limpio
+    const subcategorias = subcatsRaw.split(',')
+        .map(s => s.trim()) // Quita espacios extra
+        .filter(s => s !== ""); // Elimina elementos vacíos si puso comas de más
 
     btnGuardarCategoria.disabled = true;
     btnGuardarCategoria.innerText = "Guardando...";
 
     try {
-        await addDoc(categoriesCollection, { nombre, icono });
+        await addDoc(categoriesCollection, { nombre, icono, subcategorias });
         modalCategoria.classList.add('hidden');
-        cargarCategorias(); 
+        await cargarCategorias(); // Recargar para actualizar los selects
     } catch (error) {
         console.error("Error al guardar categoría:", error);
-        alert("Hubo un error.");
+        alert("Hubo un error al guardar.");
     } finally {
         btnGuardarCategoria.disabled = false;
         btnGuardarCategoria.innerText = "Guardar";
@@ -181,11 +201,65 @@ async function guardarCategoria() {
 }
 
 window.eliminarCategoria = async (id) => {
-    if(confirm("¿Seguro que deseas eliminar esta categoría?")) {
+    if(confirm("¿Seguro que deseas eliminar esta categoría? Esto podría afectar a los productos que la usan.")) {
         await deleteDoc(doc(db, "categories", id));
         cargarCategorias();
     }
 };
+
+// ==========================================
+// CONTROL ESTRICTO DE SELECTS (PADRE-HIJO)
+// ==========================================
+
+function actualizarSelectSubcategoriasFormulario(categoriaNombre, subcategoriaSeleccionada = "") {
+    const selectSub = document.getElementById('prod-subcategoria');
+    selectSub.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
+    
+    if (!categoriaNombre) {
+        selectSub.disabled = true;
+        selectSub.classList.add('bg-gray-50', 'text-gray-500');
+        return;
+    }
+
+    const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === categoriaNombre);
+    
+    if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
+        selectSub.disabled = false;
+        selectSub.classList.remove('bg-gray-50', 'text-gray-500');
+        
+        categoriaEncontrada.subcategorias.forEach(sub => {
+            const selected = (sub === subcategoriaSeleccionada) ? 'selected' : '';
+            selectSub.innerHTML += `<option value="${sub}" ${selected}>${sub}</option>`;
+        });
+    } else {
+        selectSub.disabled = true;
+        selectSub.innerHTML = '<option value="">No hay subcategorías registradas</option>';
+    }
+}
+
+function actualizarSelectSubcategoriasFiltro() {
+    const catFiltro = filtroCategoria.value;
+    filtroSubcategoria.innerHTML = '<option value="">Todas las Subcategorías</option>';
+    
+    if (catFiltro === "") {
+        filtroSubcategoria.disabled = true;
+        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+        return;
+    }
+
+    const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === catFiltro);
+    
+    if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
+        filtroSubcategoria.disabled = false;
+        filtroSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
+        categoriaEncontrada.subcategorias.forEach(sub => {
+            filtroSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`;
+        });
+    } else {
+        filtroSubcategoria.disabled = true;
+        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+    }
+}
 
 // ==========================================
 // MÓDULO: PRODUCTOS E INVENTARIO
@@ -201,23 +275,16 @@ async function manejarSubidaMultiplesImagenes(event) {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         btnGuardarProducto.innerText = `Subiendo ${i + 1}/${files.length}...`;
-
         try {
             const formData = new FormData();
             formData.append('image', file);
-            
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-                method: 'POST', body: formData
-            });
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
             const data = await response.json();
-            
             if (data.success) {
                 arrayImagenesUrls.push(data.data.url);
                 renderizarGaleria();
             }
-        } catch (error) {
-            console.error("Error en ImgBB:", error);
-        }
+        } catch (error) { console.error("Error en ImgBB:", error); }
     }
     btnGuardarProducto.disabled = false;
     btnGuardarProducto.innerText = textoOriginal;
@@ -248,7 +315,7 @@ async function guardarProducto() {
     const id = document.getElementById('prod-id').value;
     const nombre = document.getElementById('prod-nombre').value.trim();
     const categoria = document.getElementById('prod-categoria').value;
-    const subcategoria = document.getElementById('prod-subcategoria').value.trim(); // NUEVO
+    const subcategoria = document.getElementById('prod-subcategoria').value; 
     const precio = parseFloat(document.getElementById('prod-precio').value);
     const stock = parseInt(document.getElementById('prod-stock').value) || 0; 
     const descripcion = document.getElementById('prod-descripcion').value.trim();
@@ -262,19 +329,13 @@ async function guardarProducto() {
 
     try {
         const datos = { 
-            nombre, 
-            categoria, 
-            subcategoria, // Guardar en Firestore
-            precio, 
-            stock, 
-            descripcion,
+            nombre, categoria, subcategoria, precio, stock, descripcion,
             imagenes: arrayImagenesUrls, 
             fechaActualizacion: new Date().toISOString() 
         };
         
-        if (id) {
-            await updateDoc(doc(db, "products", id), datos);
-        } else {
+        if (id) await updateDoc(doc(db, "products", id), datos);
+        else {
             datos.fechaCreacion = new Date().toISOString();
             await addDoc(productsCollection, datos);
         }
@@ -301,54 +362,15 @@ async function cargarProductos() {
             prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
             prod.stock = prod.stock !== undefined ? prod.stock : 10; 
-            prod.subcategoria = prod.subcategoria || 'General'; // Por si hay viejos sin subcategoría
-            
+            prod.subcategoria = prod.subcategoria || 'General';
             productosGlobales.push(prod);
         });
 
-        actualizarDatalistSubcategorias(); // Llenar sugerencias del formulario
-        aplicarFiltrosProductos(); // Esto también dibuja la tabla
+        aplicarFiltrosProductos();
 
     } catch (error) { console.error(error); }
 }
 
-// NUEVO: Llena el <datalist> para autocompletar subcategorías en el formulario
-function actualizarDatalistSubcategorias() {
-    const lista = document.getElementById('lista-subcategorias');
-    lista.innerHTML = '';
-    // Extraer subcategorías únicas de todos los productos
-    const subcategoriasUnicas = [...new Set(productosGlobales.map(p => p.subcategoria).filter(Boolean))];
-    
-    subcategoriasUnicas.forEach(sub => {
-        lista.innerHTML += `<option value="${sub}">`;
-    });
-}
-
-// NUEVO: Actualiza el <select> de subcategoría del filtro según la categoría elegida
-function actualizarSelectSubcategoriasFiltro() {
-    const catFiltro = filtroCategoria.value;
-    filtroSubcategoria.innerHTML = '<option value="">Todas las Subcategorías</option>';
-    
-    if (catFiltro === "") {
-        filtroSubcategoria.disabled = true;
-        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
-        return;
-    }
-
-    filtroSubcategoria.disabled = false;
-    filtroSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
-
-    // Extraer subcategorías únicas SOLO de la categoría seleccionada
-    const subcategorias = [...new Set(productosGlobales
-        .filter(p => p.categoria === catFiltro && p.subcategoria)
-        .map(p => p.subcategoria))];
-
-    subcategorias.forEach(sub => {
-        filtroSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`;
-    });
-}
-
-// NUEVO: Filtra el arreglo global y dibuja la tabla
 function aplicarFiltrosProductos() {
     const textoBuscador = buscadorProductos.value.toLowerCase();
     const catFiltro = filtroCategoria.value;
@@ -364,7 +386,6 @@ function aplicarFiltrosProductos() {
     dibujarTablaProductos(productosFiltrados);
 }
 
-// NUEVO: Dibuja las filas HTML basadas en un arreglo
 function dibujarTablaProductos(arreglo) {
     const tbody = document.getElementById('admin-products-list');
     tbody.innerHTML = '';
@@ -377,7 +398,6 @@ function dibujarTablaProductos(arreglo) {
     arreglo.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
         let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
-
         const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
 
         tbody.innerHTML += `
@@ -403,7 +423,10 @@ function resetearModalProducto(titulo) {
     document.getElementById('prod-id').value = '';
     document.getElementById('prod-descripcion').value = '';
     document.getElementById('prod-stock').value = 1; 
-    document.getElementById('prod-subcategoria').value = ''; // NUEVO
+    
+    // Resetear subcategorías
+    actualizarSelectSubcategoriasFormulario("");
+    
     arrayImagenesUrls = [];
     renderizarGaleria();
     document.getElementById('modal-titulo').innerText = titulo;
@@ -417,10 +440,12 @@ window.prepararEdicionProd = (id) => {
     document.getElementById('prod-id').value = prod.id;
     document.getElementById('prod-nombre').value = prod.nombre;
     document.getElementById('prod-categoria').value = prod.categoria;
-    document.getElementById('prod-subcategoria').value = prod.subcategoria || ''; // NUEVO
     document.getElementById('prod-precio').value = prod.precio;
     document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10;
     document.getElementById('prod-descripcion').value = prod.descripcion || '';
+    
+    // CARGAR SUBCATEGORIAS ANTES DE SETEAR EL VALOR
+    actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria);
     
     arrayImagenesUrls = [...prod.imagenes];
     renderizarGaleria();
@@ -434,22 +459,14 @@ window.eliminarProducto = async (id) => {
     }
 };
 
-// Exportar Productos (Exporta solo lo que está filtrado)
 function exportarProductosExcel() {
     if (productosFiltrados.length === 0) return alert("No hay productos para exportar en esta vista.");
-    
     const datosLimpios = productosFiltrados.map(p => ({
-        "ID Producto": p.id,
-        "Nombre": p.nombre,
-        "Categoría": p.categoria,
-        "Subcategoría": p.subcategoria,
-        "Precio ($)": p.precio,
-        "Stock Físico": p.stock,
-        "Descripción": p.descripcion || 'N/A',
+        "ID Producto": p.id, "Nombre": p.nombre, "Categoría": p.categoria, "Subcategoría": p.subcategoria,
+        "Precio ($)": p.precio, "Stock Físico": p.stock, "Descripción": p.descripcion || 'N/A',
         "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0,
         "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A'
     }));
-
     const hoja = XLSX.utils.json_to_sheet(datosLimpios);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
@@ -457,106 +474,63 @@ function exportarProductosExcel() {
 }
 
 // ==========================================
-// MÓDULO: CLIENTES (DIRECTORIO)
+// MÓDULOS RESTANTES (Clientes y Pedidos sin cambios)
 // ==========================================
-
 async function cargarClientes() {
     const tbody = document.getElementById('admin-clients-list');
     try {
         const querySnapshot = await getDocs(usersCollection);
         tbody.innerHTML = '';
         clientesGlobales = []; 
-        
         if (querySnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>';
             return;
         }
-
         querySnapshot.forEach((docSnap) => {
             const user = docSnap.data();
             clientesGlobales.push(user);
-
             const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
-            const badgeRol = user.role === 'admin' 
-                ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' 
-                : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
+            const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
             const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-
-            tbody.innerHTML += `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td>
-                    <td class="p-4 text-gray-600">${user.email}</td>
-                    <td class="p-4 text-gray-600">${telefonoTexto}</td>
-                    <td class="p-4">${badgeRol}</td>
-                    <td class="p-4 text-gray-500">${fecha}</td>
-                </tr>
-            `;
+            tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
         });
-    } catch (error) {
-        console.error("Error al cargar clientes:", error);
-    }
+    } catch (error) { console.error(error); }
 }
 
 function exportarClientesExcel() {
     if (clientesGlobales.length === 0) return alert("No hay clientes para exportar.");
-    
     const datosLimpios = clientesGlobales.map(c => ({
-        "Nombre Completo": c.name || 'Sin nombre',
-        "Correo Electrónico": c.email,
-        "Teléfono": c.phone || 'N/A',
+        "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A',
         "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente',
         "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
     }));
-
     const hoja = XLSX.utils.json_to_sheet(datosLimpios);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Directorio");
     XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
 }
 
-// ==========================================
-// MÓDULO: PEDIDOS
-// ==========================================
-
 async function cargarPedidos() {
     const tbody = document.getElementById('admin-orders-list');
     try {
         const querySnapshot = await getDocs(ordersCollection);
         tbody.innerHTML = '';
-        
         if (querySnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Aún no hay pedidos en la tienda.</td></tr>';
             return;
         }
-
         querySnapshot.forEach((docSnap) => {
             const pedido = docSnap.data();
             const id = docSnap.id;
-            
             let colorEstado = 'bg-gray-100 text-gray-600';
             if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700';
             if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700';
             if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700';
             if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700';
             if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
-
-            tbody.innerHTML += `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4 font-mono text-sm text-gray-500">#${id.slice(-6).toUpperCase()}</td>
-                    <td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td>
-                    <td class="p-4 font-bold">$${pedido.total.toFixed(2)}</td>
-                    <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td>
-                    <td class="p-4 text-center">
-                        <button onclick="abrirModalPedido('${id}', '${pedido.estado}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">
-                            Ver / Editar
-                        </button>
-                    </td>
-                </tr>
-            `;
+            tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.total.toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${id}', '${pedido.estado}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
         });
-    } catch (error) {
-        console.log("No hay pedidos.");
-    }
+    } catch (error) {}
 }
 
 window.abrirModalPedido = (id, estadoActual) => {
@@ -568,18 +542,13 @@ window.abrirModalPedido = (id, estadoActual) => {
 async function actualizarEstadoPedido() {
     const id = document.getElementById('ped-id').value;
     const nuevoEstado = document.getElementById('ped-estado').value;
-
     btnGuardarPedido.disabled = true;
     btnGuardarPedido.innerText = "Actualizando...";
-
     try {
         await updateDoc(doc(db, "orders", id), { estado: nuevoEstado });
         modalPedido.classList.add('hidden');
         cargarPedidos();
-    } catch (error) {
-        console.error("Error al actualizar pedido:", error);
-        alert("Error al actualizar.");
-    } finally {
+    } catch (error) { alert("Error al actualizar."); } finally {
         btnGuardarPedido.disabled = false;
         btnGuardarPedido.innerText = "Actualizar Estado";
     }
