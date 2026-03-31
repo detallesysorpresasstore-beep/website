@@ -1,189 +1,220 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Detalles y Sorpresas STORE</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Configuración personalizada de Tailwind -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'brand-orange': '#ff7b54',
-                        'brand-blue': '#4facfe',
-                        'brand-pink': '#ff758c',
-                    },
-                    fontFamily: {
-                        'kids': ['"Fredoka"', 'sans-serif'],
-                    }
-                }
-            }
+/**
+ * Detalles y Sorpresas STORE - Lógica del Panel de Administración (Conectado a Firestore)
+ */
+
+import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
+// Importamos las herramientas para manipular la base de datos
+import { collection, getDocs, addDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+const appId = 'detalles-y-sorpresas-store';
+// Esta es la ruta exacta donde se guardarán tus productos en Firebase
+const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+
+// Aquí guardaremos temporalmente la lista descargada para dibujarla
+let productsList = []; 
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Proteger la ruta: Verificar si hay un usuario logueado
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            console.log("Acceso concedido al admin:", user.email);
+            initAdmin();
+        } else {
+            window.location.href = 'index.html';
         }
-    </script>
+    });
+});
 
-    <!-- Google Fonts: Fredoka -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+function initAdmin() {
+    setupEventListeners();
+    loadProducts(); // Descargamos los productos al iniciar
+}
 
-    <style>
-        body { font-family: 'Fredoka', sans-serif; background-color: #f3f4f6; }
-    </style>
-</head>
-<body class="text-gray-800 antialiased flex h-screen overflow-hidden">
+/**
+ * Descarga los productos desde Firestore
+ */
+async function loadProducts() {
+    const tbody = document.getElementById('admin-products-list');
+    if (!tbody) return;
 
-    <!-- Sidebar (Menú Lateral) -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex z-10">
-        <div class="h-20 flex items-center justify-center border-b border-gray-200">
-            <div class="text-xl font-bold flex flex-col leading-none text-center">
-                <span class="tracking-wide">
-                    <span class="text-brand-orange">PANEL</span> 
-                    <span class="text-brand-pink">ADMIN</span> 
-                </span>
-                <span class="text-brand-blue text-xs uppercase tracking-widest mt-1">D&S Store</span>
-            </div>
-        </div>
+    // Mostramos un mensaje de carga
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 font-medium"><i class="ph ph-spinner animate-spin text-xl inline-block align-middle mr-2"></i> Cargando productos desde la base de datos...</td></tr>';
+
+    try {
+        const querySnapshot = await getDocs(productsRef);
+        productsList = []; // Vaciamos la lista actual
         
-        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <a href="#" class="flex items-center gap-3 px-4 py-3 bg-blue-50 text-brand-blue rounded-xl font-medium transition-colors">
-                <i class="ph-fill ph-package text-xl"></i> Productos
-            </a>
-            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
-                <i class="ph ph-tag text-xl"></i> Categorías
-            </a>
-            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
-                <i class="ph ph-shopping-bag text-xl"></i> Pedidos
-            </a>
-            <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
-                <i class="ph ph-users text-xl"></i> Clientes
-            </a>
-        </nav>
+        querySnapshot.forEach((doc) => {
+            // Unimos el ID que le da Firebase con los datos del producto
+            productsList.push({ id: doc.id, ...doc.data() });
+        });
 
-        <div class="p-4 border-t border-gray-200">
-            <button class="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg font-medium transition-colors">
-                <i class="ph ph-sign-out text-xl"></i> Cerrar Sesión
-            </button>
-        </div>
-    </aside>
+        renderAdminProducts(); // Dibujamos la tabla
+    } catch (error) {
+        console.error("Error al cargar productos:", error);
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-red-500 font-bold">Error al conectar con la base de datos.</td></tr>';
+    }
+}
 
-    <!-- Contenido Principal -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
-        <!-- Header superior -->
-        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10">
-            <div class="flex items-center gap-4">
-                <button class="md:hidden text-gray-500 hover:text-brand-orange">
-                    <i class="ph ph-list text-3xl"></i>
-                </button>
-                <h1 class="text-2xl font-bold text-gray-800">Gestión de Productos</h1>
-            </div>
-            <div class="flex items-center gap-3">
-                <div class="text-right hidden sm:block">
-                    <p class="text-sm font-bold text-gray-800">Admin</p>
-                    <p class="text-xs text-gray-500">admin@detallesysorpresas.com</p>
+/**
+ * Renderiza la lista de productos en la tabla del panel
+ */
+function renderAdminProducts() {
+    const tbody = document.getElementById('admin-products-list');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (productsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">No hay productos registrados aún. ¡Agrega el primero!</td></tr>';
+        return;
+    }
+
+    productsList.forEach(product => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0';
+        
+        const iconClass = product.imageIcon ? product.imageIcon : 'ph-package';
+
+        tr.innerHTML = `
+            <td class="p-4">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                        <i class="ph-duotone ${iconClass} text-xl"></i>
+                    </div>
+                    <span class="font-medium text-gray-800">${product.name}</span>
                 </div>
-                <div class="h-10 w-10 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold cursor-pointer">
-                    A
-                </div>
-            </div>
-        </header>
-
-        <!-- Área de trabajo -->
-        <div class="flex-1 overflow-y-auto p-6 z-0">
-            <!-- Barra de acciones -->
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <div class="relative w-full sm:w-96">
-                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" placeholder="Buscar productos..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
-                </div>
-                <button id="btn-nuevo-producto" class="w-full sm:w-auto bg-brand-blue text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                    <i class="ph ph-plus-circle text-xl"></i> Nuevo Producto
-                </button>
-            </div>
-
-            <!-- Tabla de productos -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
-                                <th class="p-4 font-semibold">Producto</th>
-                                <th class="p-4 font-semibold">Categoría</th>
-                                <th class="p-4 font-semibold">Precio</th>
-                                <th class="p-4 font-semibold">Stock</th>
-                                <th class="p-4 font-semibold text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-products-list" class="divide-y divide-gray-200">
-                            <!-- Aquí inyectaremos los productos con JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL: Nuevo Producto -->
-        <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-full">
-                <!-- Header del Modal -->
-                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-800">Añadir Nuevo Producto</h3>
-                    <button id="btn-cerrar-modal" class="text-gray-400 hover:text-red-500 transition-colors">
-                        <i class="ph ph-x text-2xl"></i>
+            </td>
+            <td class="p-4 text-gray-500 hidden sm:table-cell">${product.category}</td>
+            <td class="p-4 text-gray-800 font-semibold">$${Number(product.price).toFixed(2)}</td>
+            <td class="p-4 hidden md:table-cell">
+                <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">En Stock</span>
+            </td>
+            <td class="p-4 text-center">
+                <div class="flex justify-center gap-2">
+                    <button class="text-gray-400 hover:text-red-500 p-1 transition-colors btn-eliminar" data-id="${product.id}" title="Eliminar">
+                        <i class="ph ph-trash text-lg"></i>
                     </button>
                 </div>
-                
-                <!-- Cuerpo del Formulario -->
-                <div class="p-6 overflow-y-auto">
-                    <form id="form-producto" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto *</label>
-                            <input type="text" id="prod-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
-                                <select id="prod-categoria" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="Ropa Niños">Ropa Niños</option>
-                                    <option value="Ropa Niñas">Ropa Niñas</option>
-                                    <option value="Pijamas Niños">Pijamas Niños</option>
-                                    <option value="Pijamas Niñas">Pijamas Niñas</option>
-                                    <option value="Juguetes">Juguetes</option>
-                                    <option value="Peluches">Peluches</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Precio ($) *</label>
-                                <input type="number" step="0.01" id="prod-precio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
-                            </div>
-                        </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Imagen (Clase de ícono)</label>
-                            <input type="text" id="prod-imagen" placeholder="Ej: ph-teddy-bear" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-gray-500">
-                        </div>
-                    </form>
-                </div>
+    // Eventos para eliminar productos
+    document.querySelectorAll('.btn-eliminar').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.target.closest('button').getAttribute('data-id');
+            eliminarProducto(id);
+        });
+    });
+}
 
-                <!-- Footer del Modal -->
-                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-                    <button id="btn-cancelar-modal" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
-                    <button id="btn-guardar-producto" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg transition-colors shadow-sm">Guardar Producto</button>
-                </div>
-            </div>
-        </div>
-    </main>
+/**
+ * Configura los eventos de los botones del panel
+ */
+function setupEventListeners() {
+    const btnNuevoProducto = document.getElementById('btn-nuevo-producto');
+    const modalProducto = document.getElementById('modal-producto');
+    const btnCerrarModal = document.getElementById('btn-cerrar-modal');
+    const btnCancelarModal = document.getElementById('btn-cancelar-modal');
+    const btnGuardarProducto = document.getElementById('btn-guardar-producto');
+    const formProducto = document.getElementById('form-producto');
+    const btnCerrarSesion = document.querySelector('aside button.text-red-500');
 
-    <!-- Script principal como MÓDULO (Esto soluciona los errores de consola) -->
-    <script type="module" src="admin.js"></script>
-</body>
-</html>
+    const abrirModal = () => modalProducto.classList.remove('hidden');
+    const cerrarModal = () => {
+        modalProducto.classList.add('hidden');
+        formProducto.reset(); 
+    };
+
+    if (btnNuevoProducto) btnNuevoProducto.addEventListener('click', abrirModal);
+    if (btnCerrarModal) btnCerrarModal.addEventListener('click', cerrarModal);
+    if (btnCancelarModal) btnCancelarModal.addEventListener('click', cerrarModal);
+
+    if (btnGuardarProducto) {
+        btnGuardarProducto.addEventListener('click', (e) => {
+            e.preventDefault();
+            guardarNuevoProducto();
+        });
+    }
+
+    if (btnCerrarSesion) {
+        btnCerrarSesion.addEventListener('click', async () => {
+            if(confirm('¿Estás seguro que deseas cerrar la sesión?')) {
+                try {
+                    await signOut(auth);
+                } catch (error) {
+                    console.error("Error al cerrar sesión", error);
+                }
+            }
+        });
+    }
+}
+
+/**
+ * Guarda un nuevo producto directamente en Firestore
+ */
+async function guardarNuevoProducto() {
+    const nombre = document.getElementById('prod-nombre').value.trim();
+    const categoria = document.getElementById('prod-categoria').value;
+    const precio = parseFloat(document.getElementById('prod-precio').value);
+    const imagen = document.getElementById('prod-imagen').value.trim() || 'ph-package';
+
+    if (!nombre || !categoria || isNaN(precio)) {
+        alert('Por favor, completa los campos obligatorios (*).');
+        return; 
+    }
+
+    const btnGuardar = document.getElementById('btn-guardar-producto');
+    const originalText = btnGuardar.innerHTML;
+    btnGuardar.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Guardando...';
+    btnGuardar.disabled = true;
+
+    // Objeto con los datos que irán a la base de datos
+    const nuevoProducto = {
+        name: nombre,
+        category: categoria,
+        price: precio,
+        imageIcon: imagen,
+        isNew: true,
+        createdAt: new Date().toISOString() // Fecha de creación
+    };
+
+    try {
+        // Magia: Enviamos los datos a Firebase
+        await addDoc(productsRef, nuevoProducto);
+        
+        // Si funcionó:
+        document.getElementById('modal-producto').classList.add('hidden');
+        document.getElementById('form-producto').reset();
+        
+        // Volvemos a descargar los productos para actualizar la tabla
+        await loadProducts();
+        
+    } catch (error) {
+        console.error("Error al guardar en BD:", error);
+        alert("Hubo un error al guardar el producto.");
+    } finally {
+        btnGuardar.innerHTML = originalText;
+        btnGuardar.disabled = false;
+    }
+}
+
+/**
+ * Elimina un producto de Firestore
+ */
+async function eliminarProducto(id) {
+    if (confirm('¿Estás seguro de que deseas eliminar este producto PERMANENTEMENTE de la base de datos?')) {
+        try {
+            // Apuntamos al documento exacto en Firebase y lo borramos
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+            
+            // Volvemos a descargar los productos para actualizar la tabla
+            await loadProducts();
+        } catch (error) {
+            console.error("Error al eliminar de BD:", error);
+            alert("Error al eliminar el producto.");
+        }
+    }
+}
