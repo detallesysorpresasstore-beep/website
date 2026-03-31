@@ -17,7 +17,12 @@ const btnLogout = document.getElementById('btn-logout');
 const modalProducto = document.getElementById('modal-producto');
 const btnNuevoProducto = document.getElementById('btn-nuevo-producto');
 const btnGuardarProducto = document.getElementById('btn-guardar-producto');
-const btnExportarProductos = document.getElementById('btn-exportar-productos'); // NUEVO
+const btnExportarProductos = document.getElementById('btn-exportar-productos');
+
+// Filtros de Productos
+const buscadorProductos = document.getElementById('buscador-productos');
+const filtroCategoria = document.getElementById('filtro-categoria');
+const filtroSubcategoria = document.getElementById('filtro-subcategoria');
 
 // Modales y Botones de Categorías
 const modalCategoria = document.getElementById('modal-categoria');
@@ -29,7 +34,7 @@ const modalPedido = document.getElementById('modal-pedido');
 const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
 
 // Botones de Clientes
-const btnExportarClientes = document.getElementById('btn-exportar-clientes'); // NUEVO
+const btnExportarClientes = document.getElementById('btn-exportar-clientes');
 
 // Referencias a Colecciones en Firestore
 const productsCollection = collection(db, "products");
@@ -39,7 +44,8 @@ const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/pub
 
 // Variables Globales
 let productosGlobales = [];
-let clientesGlobales = []; // NUEVO: Para guardar los clientes y exportarlos
+let productosFiltrados = []; // NUEVO: Para la tabla y exportación con filtros
+let clientesGlobales = []; 
 let arrayImagenesUrls = [];
 
 // ==========================================
@@ -82,8 +88,15 @@ function configurarEventos() {
     document.getElementById('prod-imagen').addEventListener('change', manejarSubidaMultiplesImagenes);
     btnGuardarProducto.addEventListener('click', guardarProducto);
     
-    // NUEVO: Evento para exportar Excel de Productos
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
+
+    // NUEVO: Eventos de Filtros
+    buscadorProductos.addEventListener('input', aplicarFiltrosProductos);
+    filtroCategoria.addEventListener('change', () => {
+        actualizarSelectSubcategoriasFiltro();
+        aplicarFiltrosProductos();
+    });
+    filtroSubcategoria.addEventListener('change', aplicarFiltrosProductos);
 
     // ---- EVENTOS CATEGORÍAS ----
     btnNuevaCategoria.addEventListener('click', () => {
@@ -100,7 +113,6 @@ function configurarEventos() {
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
 
     // ---- EVENTOS CLIENTES ----
-    // NUEVO: Evento para exportar Excel de Clientes
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
 }
 
@@ -116,6 +128,7 @@ async function cargarCategorias() {
         const querySnapshot = await getDocs(categoriesCollection);
         tbody.innerHTML = '';
         selectProd.innerHTML = '<option value="">Seleccionar categoría...</option>';
+        filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>'; // Actualiza el filtro también
 
         if (querySnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">No hay categorías. Crea una.</td></tr>';
@@ -138,6 +151,7 @@ async function cargarCategorias() {
                 </tr>
             `;
             selectProd.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
+            filtroCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
         });
     } catch (error) {
         console.error("Error cargando categorías:", error);
@@ -234,12 +248,13 @@ async function guardarProducto() {
     const id = document.getElementById('prod-id').value;
     const nombre = document.getElementById('prod-nombre').value.trim();
     const categoria = document.getElementById('prod-categoria').value;
+    const subcategoria = document.getElementById('prod-subcategoria').value.trim(); // NUEVO
     const precio = parseFloat(document.getElementById('prod-precio').value);
-    const stock = parseInt(document.getElementById('prod-stock').value) || 0; // NUEVO: Capturar stock
+    const stock = parseInt(document.getElementById('prod-stock').value) || 0; 
     const descripcion = document.getElementById('prod-descripcion').value.trim();
 
-    if (!nombre || !categoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
-        return alert("Completa los datos obligatorios y sube al menos una foto.");
+    if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
+        return alert("Completa los datos obligatorios (incluyendo subcategoría) y sube al menos una foto.");
     }
 
     btnGuardarProducto.disabled = true;
@@ -249,8 +264,9 @@ async function guardarProducto() {
         const datos = { 
             nombre, 
             categoria, 
+            subcategoria, // Guardar en Firestore
             precio, 
-            stock, // Guardar en Firestore
+            stock, 
             descripcion,
             imagenes: arrayImagenesUrls, 
             fechaActualizacion: new Date().toISOString() 
@@ -274,52 +290,120 @@ async function guardarProducto() {
 
 async function cargarProductos() {
     const tbody = document.getElementById('admin-products-list');
+    tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center"><i class="ph ph-spinner animate-spin text-2xl"></i> Cargando...</td></tr>';
+
     try {
         const querySnapshot = await getDocs(productsCollection);
-        tbody.innerHTML = '';
         productosGlobales = [];
         
-        if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay productos.</td></tr>';
-            return;
-        }
-
         querySnapshot.forEach((docSnap) => {
             const prod = docSnap.data();
             prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
-            // Asegurarse de que stock exista para productos viejos
             prod.stock = prod.stock !== undefined ? prod.stock : 10; 
+            prod.subcategoria = prod.subcategoria || 'General'; // Por si hay viejos sin subcategoría
             
             productosGlobales.push(prod);
-            
-            const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
-            let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
-
-            // Color del stock dependiendo de la cantidad (rojo si es poco)
-            const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
-
-            tbody.innerHTML += `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td>
-                    <td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs">${prod.categoria}</span></td>
-                    <td class="p-4 font-bold">$${prod.precio.toFixed(2)}</td>
-                    <td class="p-4 ${stockColor}">${prod.stock} unds</td>
-                    <td class="p-4 text-center">
-                        <button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button>
-                        <button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button>
-                    </td>
-                </tr>
-            `;
         });
+
+        actualizarDatalistSubcategorias(); // Llenar sugerencias del formulario
+        aplicarFiltrosProductos(); // Esto también dibuja la tabla
+
     } catch (error) { console.error(error); }
+}
+
+// NUEVO: Llena el <datalist> para autocompletar subcategorías en el formulario
+function actualizarDatalistSubcategorias() {
+    const lista = document.getElementById('lista-subcategorias');
+    lista.innerHTML = '';
+    // Extraer subcategorías únicas de todos los productos
+    const subcategoriasUnicas = [...new Set(productosGlobales.map(p => p.subcategoria).filter(Boolean))];
+    
+    subcategoriasUnicas.forEach(sub => {
+        lista.innerHTML += `<option value="${sub}">`;
+    });
+}
+
+// NUEVO: Actualiza el <select> de subcategoría del filtro según la categoría elegida
+function actualizarSelectSubcategoriasFiltro() {
+    const catFiltro = filtroCategoria.value;
+    filtroSubcategoria.innerHTML = '<option value="">Todas las Subcategorías</option>';
+    
+    if (catFiltro === "") {
+        filtroSubcategoria.disabled = true;
+        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+        return;
+    }
+
+    filtroSubcategoria.disabled = false;
+    filtroSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
+
+    // Extraer subcategorías únicas SOLO de la categoría seleccionada
+    const subcategorias = [...new Set(productosGlobales
+        .filter(p => p.categoria === catFiltro && p.subcategoria)
+        .map(p => p.subcategoria))];
+
+    subcategorias.forEach(sub => {
+        filtroSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`;
+    });
+}
+
+// NUEVO: Filtra el arreglo global y dibuja la tabla
+function aplicarFiltrosProductos() {
+    const textoBuscador = buscadorProductos.value.toLowerCase();
+    const catFiltro = filtroCategoria.value;
+    const subCatFiltro = filtroSubcategoria.value;
+
+    productosFiltrados = productosGlobales.filter(prod => {
+        const coincideTexto = prod.nombre.toLowerCase().includes(textoBuscador);
+        const coincideCat = catFiltro === "" || prod.categoria === catFiltro;
+        const coincideSubCat = subCatFiltro === "" || prod.subcategoria === subCatFiltro;
+        return coincideTexto && coincideCat && coincideSubCat;
+    });
+
+    dibujarTablaProductos(productosFiltrados);
+}
+
+// NUEVO: Dibuja las filas HTML basadas en un arreglo
+function dibujarTablaProductos(arreglo) {
+    const tbody = document.getElementById('admin-products-list');
+    tbody.innerHTML = '';
+
+    if (arreglo.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos con estos filtros.</td></tr>';
+        return;
+    }
+
+    arreglo.forEach(prod => {
+        const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
+        let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
+
+        const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
+
+        tbody.innerHTML += `
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td>
+                <td class="p-4">
+                    <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span>
+                    <br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span>
+                </td>
+                <td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td>
+                <td class="p-4 ${stockColor}">${prod.stock} unds</td>
+                <td class="p-4 text-center">
+                    <button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button>
+                    <button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button>
+                </td>
+            </tr>
+        `;
+    });
 }
 
 function resetearModalProducto(titulo) {
     document.getElementById('form-producto').reset();
     document.getElementById('prod-id').value = '';
     document.getElementById('prod-descripcion').value = '';
-    document.getElementById('prod-stock').value = 1; // Stock por defecto al crear
+    document.getElementById('prod-stock').value = 1; 
+    document.getElementById('prod-subcategoria').value = ''; // NUEVO
     arrayImagenesUrls = [];
     renderizarGaleria();
     document.getElementById('modal-titulo').innerText = titulo;
@@ -333,6 +417,7 @@ window.prepararEdicionProd = (id) => {
     document.getElementById('prod-id').value = prod.id;
     document.getElementById('prod-nombre').value = prod.nombre;
     document.getElementById('prod-categoria').value = prod.categoria;
+    document.getElementById('prod-subcategoria').value = prod.subcategoria || ''; // NUEVO
     document.getElementById('prod-precio').value = prod.precio;
     document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10;
     document.getElementById('prod-descripcion').value = prod.descripcion || '';
@@ -349,15 +434,15 @@ window.eliminarProducto = async (id) => {
     }
 };
 
-// NUEVO: Función para exportar Productos a Excel
+// Exportar Productos (Exporta solo lo que está filtrado)
 function exportarProductosExcel() {
-    if (productosGlobales.length === 0) return alert("No hay productos para exportar.");
+    if (productosFiltrados.length === 0) return alert("No hay productos para exportar en esta vista.");
     
-    // Mapeamos los datos para que el Excel quede limpio y legible
-    const datosLimpios = productosGlobales.map(p => ({
+    const datosLimpios = productosFiltrados.map(p => ({
         "ID Producto": p.id,
         "Nombre": p.nombre,
         "Categoría": p.categoria,
+        "Subcategoría": p.subcategoria,
         "Precio ($)": p.precio,
         "Stock Físico": p.stock,
         "Descripción": p.descripcion || 'N/A',
@@ -365,13 +450,10 @@ function exportarProductosExcel() {
         "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A'
     }));
 
-    // Uso de la librería SheetJS
     const hoja = XLSX.utils.json_to_sheet(datosLimpios);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
-    
-    // Descarga automática
-    XLSX.writeFile(libro, "Inventario_DetallesYSorpresas.xlsx");
+    XLSX.writeFile(libro, "Inventario_Filtrado_D&S.xlsx");
 }
 
 // ==========================================
@@ -383,7 +465,7 @@ async function cargarClientes() {
     try {
         const querySnapshot = await getDocs(usersCollection);
         tbody.innerHTML = '';
-        clientesGlobales = []; // Limpiamos el arreglo global
+        clientesGlobales = []; 
         
         if (querySnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>';
@@ -392,7 +474,7 @@ async function cargarClientes() {
 
         querySnapshot.forEach((docSnap) => {
             const user = docSnap.data();
-            clientesGlobales.push(user); // Guardamos para exportar luego
+            clientesGlobales.push(user);
 
             const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
             const badgeRol = user.role === 'admin' 
@@ -415,7 +497,6 @@ async function cargarClientes() {
     }
 }
 
-// NUEVO: Función para exportar Clientes a Excel
 function exportarClientesExcel() {
     if (clientesGlobales.length === 0) return alert("No hay clientes para exportar.");
     
@@ -430,8 +511,6 @@ function exportarClientesExcel() {
     const hoja = XLSX.utils.json_to_sheet(datosLimpios);
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Directorio");
-    
-    // Descarga automática
     XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
 }
 
