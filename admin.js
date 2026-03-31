@@ -17,6 +17,7 @@ const btnLogout = document.getElementById('btn-logout');
 const modalProducto = document.getElementById('modal-producto');
 const btnNuevoProducto = document.getElementById('btn-nuevo-producto');
 const btnGuardarProducto = document.getElementById('btn-guardar-producto');
+const btnExportarProductos = document.getElementById('btn-exportar-productos'); // NUEVO
 
 // Modales y Botones de Categorías
 const modalCategoria = document.getElementById('modal-categoria');
@@ -27,6 +28,9 @@ const btnGuardarCategoria = document.getElementById('btn-guardar-categoria');
 const modalPedido = document.getElementById('modal-pedido');
 const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
 
+// Botones de Clientes
+const btnExportarClientes = document.getElementById('btn-exportar-clientes'); // NUEVO
+
 // Referencias a Colecciones en Firestore
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
@@ -35,6 +39,7 @@ const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/pub
 
 // Variables Globales
 let productosGlobales = [];
+let clientesGlobales = []; // NUEVO: Para guardar los clientes y exportarlos
 let arrayImagenesUrls = [];
 
 // ==========================================
@@ -76,6 +81,9 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('prod-imagen').addEventListener('change', manejarSubidaMultiplesImagenes);
     btnGuardarProducto.addEventListener('click', guardarProducto);
+    
+    // NUEVO: Evento para exportar Excel de Productos
+    if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
 
     // ---- EVENTOS CATEGORÍAS ----
     btnNuevaCategoria.addEventListener('click', () => {
@@ -90,6 +98,10 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
+
+    // ---- EVENTOS CLIENTES ----
+    // NUEVO: Evento para exportar Excel de Clientes
+    if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
 }
 
 // ==========================================
@@ -162,7 +174,7 @@ window.eliminarCategoria = async (id) => {
 };
 
 // ==========================================
-// MÓDULO: PRODUCTOS 
+// MÓDULO: PRODUCTOS E INVENTARIO
 // ==========================================
 
 async function manejarSubidaMultiplesImagenes(event) {
@@ -223,8 +235,7 @@ async function guardarProducto() {
     const nombre = document.getElementById('prod-nombre').value.trim();
     const categoria = document.getElementById('prod-categoria').value;
     const precio = parseFloat(document.getElementById('prod-precio').value);
-    
-    // NUEVO: Capturar descripción
+    const stock = parseInt(document.getElementById('prod-stock').value) || 0; // NUEVO: Capturar stock
     const descripcion = document.getElementById('prod-descripcion').value.trim();
 
     if (!nombre || !categoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
@@ -235,14 +246,13 @@ async function guardarProducto() {
     btnGuardarProducto.innerText = "Guardando...";
 
     try {
-        // NUEVO: Añadir la descripción al objeto de datos
         const datos = { 
             nombre, 
             categoria, 
             precio, 
-            descripcion, // Se guarda en Firestore
+            stock, // Guardar en Firestore
+            descripcion,
             imagenes: arrayImagenesUrls, 
-            stock: 10, 
             fechaActualizacion: new Date().toISOString() 
         };
         
@@ -270,7 +280,7 @@ async function cargarProductos() {
         productosGlobales = [];
         
         if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center">No hay productos.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay productos.</td></tr>';
             return;
         }
 
@@ -278,16 +288,23 @@ async function cargarProductos() {
             const prod = docSnap.data();
             prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
+            // Asegurarse de que stock exista para productos viejos
+            prod.stock = prod.stock !== undefined ? prod.stock : 10; 
+            
             productosGlobales.push(prod);
             
             const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
             let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
+
+            // Color del stock dependiendo de la cantidad (rojo si es poco)
+            const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
 
             tbody.innerHTML += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td>
                     <td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs">${prod.categoria}</span></td>
                     <td class="p-4 font-bold">$${prod.precio.toFixed(2)}</td>
+                    <td class="p-4 ${stockColor}">${prod.stock} unds</td>
                     <td class="p-4 text-center">
                         <button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button>
                         <button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button>
@@ -301,10 +318,8 @@ async function cargarProductos() {
 function resetearModalProducto(titulo) {
     document.getElementById('form-producto').reset();
     document.getElementById('prod-id').value = '';
-    
-    // NUEVO: Limpiar descripción
     document.getElementById('prod-descripcion').value = '';
-    
+    document.getElementById('prod-stock').value = 1; // Stock por defecto al crear
     arrayImagenesUrls = [];
     renderizarGaleria();
     document.getElementById('modal-titulo').innerText = titulo;
@@ -319,8 +334,7 @@ window.prepararEdicionProd = (id) => {
     document.getElementById('prod-nombre').value = prod.nombre;
     document.getElementById('prod-categoria').value = prod.categoria;
     document.getElementById('prod-precio').value = prod.precio;
-    
-    // NUEVO: Cargar la descripción si existe
+    document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10;
     document.getElementById('prod-descripcion').value = prod.descripcion || '';
     
     arrayImagenesUrls = [...prod.imagenes];
@@ -335,6 +349,31 @@ window.eliminarProducto = async (id) => {
     }
 };
 
+// NUEVO: Función para exportar Productos a Excel
+function exportarProductosExcel() {
+    if (productosGlobales.length === 0) return alert("No hay productos para exportar.");
+    
+    // Mapeamos los datos para que el Excel quede limpio y legible
+    const datosLimpios = productosGlobales.map(p => ({
+        "ID Producto": p.id,
+        "Nombre": p.nombre,
+        "Categoría": p.categoria,
+        "Precio ($)": p.precio,
+        "Stock Físico": p.stock,
+        "Descripción": p.descripcion || 'N/A',
+        "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0,
+        "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A'
+    }));
+
+    // Uso de la librería SheetJS
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
+    
+    // Descarga automática
+    XLSX.writeFile(libro, "Inventario_DetallesYSorpresas.xlsx");
+}
+
 // ==========================================
 // MÓDULO: CLIENTES (DIRECTORIO)
 // ==========================================
@@ -344,23 +383,28 @@ async function cargarClientes() {
     try {
         const querySnapshot = await getDocs(usersCollection);
         tbody.innerHTML = '';
+        clientesGlobales = []; // Limpiamos el arreglo global
         
         if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center">No hay usuarios registrados.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>';
             return;
         }
 
         querySnapshot.forEach((docSnap) => {
             const user = docSnap.data();
+            clientesGlobales.push(user); // Guardamos para exportar luego
+
             const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
             const badgeRol = user.role === 'admin' 
                 ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' 
                 : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
+            const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
 
             tbody.innerHTML += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td>
                     <td class="p-4 text-gray-600">${user.email}</td>
+                    <td class="p-4 text-gray-600">${telefonoTexto}</td>
                     <td class="p-4">${badgeRol}</td>
                     <td class="p-4 text-gray-500">${fecha}</td>
                 </tr>
@@ -369,6 +413,26 @@ async function cargarClientes() {
     } catch (error) {
         console.error("Error al cargar clientes:", error);
     }
+}
+
+// NUEVO: Función para exportar Clientes a Excel
+function exportarClientesExcel() {
+    if (clientesGlobales.length === 0) return alert("No hay clientes para exportar.");
+    
+    const datosLimpios = clientesGlobales.map(c => ({
+        "Nombre Completo": c.name || 'Sin nombre',
+        "Correo Electrónico": c.email,
+        "Teléfono": c.phone || 'N/A',
+        "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente',
+        "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
+    }));
+
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Directorio");
+    
+    // Descarga automática
+    XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
 }
 
 // ==========================================
