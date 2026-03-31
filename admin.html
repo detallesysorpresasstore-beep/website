@@ -2,13 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Detalles y Sorpresas STORE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> <title>Admin - Detalles y Sorpresas STORE</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Configuración personalizada de Tailwind -->
     <script>
         tailwind.config = {
             theme: {
@@ -26,30 +23,34 @@
         }
     </script>
 
-    <!-- Google Fonts: Fredoka -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
         body { font-family: 'Fredoka', sans-serif; background-color: #f3f4f6; }
+        /* Evitar el 'tap highlight' azul feo en Android */
+        * { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
-<body class="text-gray-800 antialiased flex h-screen overflow-hidden">
+<body class="text-gray-800 antialiased flex h-screen overflow-hidden relative">
 
-    <!-- Sidebar (Menú Lateral) -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex z-10">
-        <div class="h-20 flex items-center justify-center border-b border-gray-200">
-            <div class="text-xl font-bold flex flex-col leading-none text-center">
+    <div id="sidebar-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden transition-opacity"></div>
+
+    <aside id="admin-sidebar" class="fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="h-20 flex items-center justify-between px-4 border-b border-gray-200">
+            <div class="text-xl font-bold flex flex-col leading-none text-center w-full">
                 <span class="tracking-wide">
                     <span class="text-brand-orange">PANEL</span> 
                     <span class="text-brand-pink">ADMIN</span> 
                 </span>
                 <span class="text-brand-blue text-xs uppercase tracking-widest mt-1">D&S Store</span>
             </div>
+            <button id="btn-cerrar-sidebar" class="md:hidden text-gray-400 hover:text-red-500">
+                <i class="ph ph-x text-2xl"></i>
+            </button>
         </div>
         
         <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -68,90 +69,81 @@
         </nav>
 
         <div class="p-4 border-t border-gray-200">
-            <button class="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg font-medium transition-colors">
+            <button class="text-red-500 w-full flex items-center justify-center gap-2 px-4 py-2 hover:bg-red-50 rounded-lg font-medium transition-colors">
                 <i class="ph ph-sign-out text-xl"></i> Cerrar Sesión
             </button>
         </div>
     </aside>
 
-    <!-- Contenido Principal -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
-        <!-- Header superior -->
-        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-10">
+    <main class="flex-1 flex flex-col overflow-hidden relative w-full">
+        <header class="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-10">
             <div class="flex items-center gap-4">
-                <button class="md:hidden text-gray-500 hover:text-brand-orange">
+                <button id="btn-abrir-sidebar" class="md:hidden text-gray-500 hover:text-brand-orange p-1">
                     <i class="ph ph-list text-3xl"></i>
                 </button>
-                <h1 class="text-2xl font-bold text-gray-800">Gestión de Productos</h1>
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-800 truncate">Gestión de Productos</h1>
             </div>
             <div class="flex items-center gap-3">
                 <div class="text-right hidden sm:block">
                     <p class="text-sm font-bold text-gray-800">Admin</p>
-                    <p class="text-xs text-gray-500">Administrador de Tienda</p>
+                    <p class="text-xs text-gray-500">Administrador</p>
                 </div>
-                <div class="h-10 w-10 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold cursor-pointer">
+                <div class="h-10 w-10 min-w-[40px] rounded-full bg-brand-orange flex items-center justify-center text-white font-bold cursor-pointer shadow-sm">
                     A
                 </div>
             </div>
         </header>
 
-        <!-- Área de trabajo -->
-        <div class="flex-1 overflow-y-auto p-6 z-0">
-            <!-- Barra de acciones -->
+        <div class="flex-1 overflow-y-auto p-4 sm:p-6 z-0">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div class="relative w-full sm:w-96">
                     <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" placeholder="Buscar productos..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                    <input type="text" id="buscador-productos" placeholder="Buscar productos..." class="w-full pl-10 pr-4 py-3 sm:py-2 border border-gray-300 rounded-xl sm:rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-base">
                 </div>
-                <button id="btn-nuevo-producto" class="w-full sm:w-auto bg-brand-blue text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <button id="btn-nuevo-producto" class="w-full sm:w-auto bg-brand-blue text-white px-6 py-3 sm:py-2 rounded-xl sm:rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm active:scale-95 transform duration-150">
                     <i class="ph ph-plus-circle text-xl"></i> Nuevo Producto
                 </button>
             </div>
 
-            <!-- Tabla de productos -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
-                                <th class="p-4 font-semibold">Producto</th>
-                                <th class="p-4 font-semibold hidden sm:table-cell">Categoría</th>
-                                <th class="p-4 font-semibold">Precio</th>
-                                <th class="p-4 font-semibold hidden md:table-cell">Stock</th>
-                                <th class="p-4 font-semibold text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-products-list" class="divide-y divide-gray-200">
-                            <!-- Aquí inyectaremos los productos con JS desde Firestore -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
+                            <th class="p-4 font-semibold">Producto</th>
+                            <th class="p-4 font-semibold">Categoría</th>
+                            <th class="p-4 font-semibold">Precio</th>
+                            <th class="p-4 font-semibold">Stock</th>
+                            <th class="p-4 font-semibold text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-products-list" class="divide-y divide-gray-200">
                         </tbody>
-                    </table>
-                </div>
+                </table>
             </div>
         </div>
 
-        <!-- MODAL: Nuevo Producto -->
-        <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-full">
-                <!-- Header del Modal -->
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <h3 class="text-lg font-bold text-gray-800">Añadir Nuevo Producto</h3>
-                    <button id="btn-cerrar-modal" class="text-gray-400 hover:text-red-500 transition-colors">
+                    <h3 id="modal-titulo" class="text-lg font-bold text-gray-800">Añadir Nuevo Producto</h3>
+                    <button id="btn-cerrar-modal" class="text-gray-400 hover:text-red-500 transition-colors p-1">
                         <i class="ph ph-x text-2xl"></i>
                     </button>
                 </div>
                 
-                <!-- Cuerpo del Formulario -->
                 <div class="p-6 overflow-y-auto">
                     <form id="form-producto" class="space-y-4">
+                        <input type="hidden" id="prod-id">
+                        
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto *</label>
-                            <input type="text" id="prod-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                            <input type="text" id="prod-nombre" required class="w-full px-4 py-3 sm:py-2 border border-gray-300 rounded-xl sm:rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-base">
                         </div>
                         
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
-                                <select id="prod-categoria" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                                <select id="prod-categoria" required class="w-full px-4 py-3 sm:py-2 border border-gray-300 rounded-xl sm:rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-base bg-white">
                                     <option value="">Seleccionar...</option>
                                     <option value="Ropa Niños">Ropa Niños</option>
                                     <option value="Ropa Niñas">Ropa Niñas</option>
@@ -163,27 +155,43 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Precio ($) *</label>
-                                <input type="number" step="0.01" id="prod-precio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue">
+                                <input type="number" step="0.01" inputmode="decimal" id="prod-precio" required class="w-full px-4 py-3 sm:py-2 border border-gray-300 rounded-xl sm:rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-base">
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Imagen (Clase de ícono)</label>
-                            <input type="text" id="prod-imagen" placeholder="Ej: ph-teddy-bear" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-gray-500">
+                            <input type="text" id="prod-imagen" placeholder="Ej: ph-teddy-bear" class="w-full px-4 py-3 sm:py-2 border border-gray-300 rounded-xl sm:rounded-lg focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-gray-500 text-base">
                         </div>
                     </form>
                 </div>
 
-                <!-- Footer del Modal -->
                 <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-                    <button id="btn-cancelar-modal" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
-                    <button id="btn-guardar-producto" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg transition-colors shadow-sm">Guardar Producto</button>
+                    <button id="btn-cancelar-modal" class="px-5 py-3 sm:py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-xl sm:rounded-lg transition-colors w-full sm:w-auto">Cancelar</button>
+                    <button id="btn-guardar-producto" type="button" class="px-5 py-3 sm:py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-xl sm:rounded-lg transition-colors shadow-sm w-full sm:w-auto active:scale-95 transform duration-150">Guardar</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <!-- Script principal como MÓDULO (Esto soluciona los errores de consola) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnAbrir = document.getElementById('btn-abrir-sidebar');
+            const btnCerrar = document.getElementById('btn-cerrar-sidebar');
+            const sidebar = document.getElementById('admin-sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+
+            function toggleMenu() {
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            }
+
+            if(btnAbrir) btnAbrir.addEventListener('click', toggleMenu);
+            if(btnCerrar) btnCerrar.addEventListener('click', toggleMenu);
+            if(overlay) overlay.addEventListener('click', toggleMenu);
+        });
+    </script>
+
     <script type="module" src="admin.js"></script>
 </body>
 </html>
