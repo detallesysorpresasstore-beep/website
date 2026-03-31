@@ -1,22 +1,32 @@
+// firebase-config.js
+// Configuración centralizada de Firebase para Detalles y Sorpresas STORE
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Tu configuración web de Firebase
+// 1. IMPORTACIÓN NUEVA: Módulo para gestión de archivos (Imágenes)
+import { getStorage } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+// TODO: Reemplaza estos datos con la configuración real de tu proyecto de Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDs83zqJo_JkRgCrApVwMQR3MxjrtPYltI",
-  authDomain: "detalles-y-sorpresas-store.firebaseapp.com",
-  projectId: "detalles-y-sorpresas-store",
-  storageBucket: "detalles-y-sorpresas-store.firebasestorage.app",
-  messagingSenderId: "853458086140",
-  appId: "1:853458086140:web:a7c422eef3b8de7ff84f79",
-  measurementId: "G-M816B3BWMQ"
+    apiKey: "TU_API_KEY_AQUÍ",
+    authDomain: "TU_PROJECT_ID.firebaseapp.com",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_PROJECT_ID.firebasestorage.app", // Asegúrate que termine en .firebasestorage.app
+    messagingSenderId: "TU_MESSAGING_SENDER_ID",
+    appId: "TU_APP_ID"
 };
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
-// Exportamos los servicios para poder usarlos en el resto de la aplicación
-export { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut };
+// Inicializar servicios y exportarlos
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// 2. INICIALIZACIÓN Y EXPORTACIÓN NUEVA: Servicio de Storage
+export const storage = getStorage(app);
+
+// Re-exportar funciones útiles de Auth para no tener que importarlas en cada archivo
+export { onAuthStateChanged, signOut };
