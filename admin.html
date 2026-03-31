@@ -129,7 +129,7 @@
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 text-sm uppercase tracking-wider">
                                 <th class="p-4 font-semibold">Categoría</th>
-                                <th class="p-4 font-semibold">Ícono (Clase)</th>
+                                <th class="p-4 font-semibold">Ícono Visual</th>
                                 <th class="p-4 font-semibold text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -224,7 +224,7 @@
         </div>
 
         <div id="modal-categoria" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
-            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <h3 id="modal-titulo-cat" class="text-lg font-bold text-gray-800">Nueva Categoría</h3>
                     <button id="btn-cerrar-modal-cat" class="text-gray-400 hover:text-red-500 p-1">
@@ -235,13 +235,26 @@
                     <form id="form-categoria" class="space-y-4">
                         <input type="hidden" id="cat-id">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Categoría *</label>
                             <input type="text" id="cat-nombre" required placeholder="Ej: Ropa Niños" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
                         </div>
+                        
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Clase del Ícono (Phosphor) *</label>
-                            <input type="text" id="cat-icono" required placeholder="Ej: ph-t-shirt" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
-                            <p class="text-xs text-gray-500 mt-1">Busca íconos en phosphoricons.com</p>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Selecciona un Ícono *</label>
+                            <input type="hidden" id="cat-icono" value="ph-duotone ph-t-shirt">
+                            
+                            <div class="grid grid-cols-5 gap-2" id="icon-selector">
+                                <button type="button" data-icon="ph-duotone ph-t-shirt" class="icon-btn flex items-center justify-center h-12 border-2 border-brand-blue bg-blue-50 text-brand-blue rounded-xl text-2xl transition-all"><i class="ph-duotone ph-t-shirt"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-dress" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-dress"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-moon-stars" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-moon-stars"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-baby" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-baby"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-teddy-bear" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-teddy-bear"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-train" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-train"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-horse" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-horse"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-rocket-launch" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-rocket-launch"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-puzzle-piece" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-puzzle-piece"></i></button>
+                                <button type="button" data-icon="ph-duotone ph-star" class="icon-btn flex items-center justify-center h-12 border-2 border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-star"></i></button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -285,6 +298,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // 1. Control Sidebar Móvil
             const btnAbrir = document.getElementById('btn-abrir-sidebar');
             const btnCerrar = document.getElementById('btn-cerrar-sidebar');
             const sidebar = document.getElementById('admin-sidebar');
@@ -298,6 +312,7 @@
             if(btnCerrar) btnCerrar.addEventListener('click', toggleMenu);
             if(overlay) overlay.addEventListener('click', toggleMenu);
 
+            // 2. Control de Pestañas
             const navBtns = document.querySelectorAll('.nav-btn');
             const vistas = document.querySelectorAll('.vista-seccion');
             const tituloSeccion = document.getElementById('titulo-seccion');
@@ -332,6 +347,29 @@
                     if(window.innerWidth < 768) toggleMenu();
                 });
             });
+
+            // 3. Control del Selector Visual de Íconos
+            const iconBtns = document.querySelectorAll('.icon-btn');
+            const inputIcono = document.getElementById('cat-icono');
+
+            if (iconBtns.length > 0) {
+                iconBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        // Apagar todos los botones
+                        iconBtns.forEach(b => {
+                            b.classList.remove('border-brand-blue', 'bg-blue-50', 'text-brand-blue');
+                            b.classList.add('border-transparent', 'bg-gray-50', 'text-gray-500');
+                        });
+                        
+                        // Encender el botón clickeado
+                        btn.classList.remove('border-transparent', 'bg-gray-50', 'text-gray-500');
+                        btn.classList.add('border-brand-blue', 'bg-blue-50', 'text-brand-blue');
+                        
+                        // Guardar el valor real en el input oculto que leerá admin.js
+                        inputIcono.value = btn.getAttribute('data-icon');
+                    });
+                });
+            }
         });
     </script>
 
