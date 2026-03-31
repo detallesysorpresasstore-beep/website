@@ -30,6 +30,12 @@ const modalCategoria = document.getElementById('modal-categoria');
 const btnNuevaCategoria = document.getElementById('btn-nueva-categoria');
 const btnGuardarCategoria = document.getElementById('btn-guardar-categoria');
 
+// NUEVO: Modales y Botones de Subcategorías
+const modalSubcategoria = document.getElementById('modal-subcategoria');
+const btnNuevaSubcategoria = document.getElementById('btn-nueva-subcategoria');
+const btnGuardarSubcategoria = document.getElementById('btn-guardar-subcategoria');
+const selectSubcatParent = document.getElementById('subcat-parent');
+
 // Modales y Botones de Pedidos
 const modalPedido = document.getElementById('modal-pedido');
 const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
@@ -46,7 +52,7 @@ const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/pub
 // Variables Globales
 let productosGlobales = [];
 let productosFiltrados = [];
-let categoriasGlobales = []; // NUEVO: Para guardar la relación padre-hijo
+let categoriasGlobales = []; 
 let clientesGlobales = []; 
 let arrayImagenesUrls = [];
 
@@ -58,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarSeguridad();
     configurarEventos();
     
-    // Es crítico cargar categorías primero para establecer las relaciones
+    // Cargar categorías primero es vital para las relaciones
     cargarCategorias().then(() => {
         cargarProductos();
     });
@@ -94,7 +100,6 @@ function configurarEventos() {
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
 
-    // NUEVO: Escuchar el cambio de categoría en el formulario de producto
     selectProdCategoria.addEventListener('change', (e) => {
         actualizarSelectSubcategoriasFormulario(e.target.value);
     });
@@ -107,7 +112,7 @@ function configurarEventos() {
     });
     filtroSubcategoria.addEventListener('change', aplicarFiltrosProductos);
 
-    // ---- EVENTOS CATEGORÍAS ----
+    // ---- EVENTOS CATEGORÍAS PRINCIPALES ----
     btnNuevaCategoria.addEventListener('click', () => {
         document.getElementById('form-categoria').reset();
         modalCategoria.classList.remove('hidden');
@@ -115,6 +120,17 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
+
+    // ---- NUEVO: EVENTOS SUBCATEGORÍAS ----
+    if (btnNuevaSubcategoria) {
+        btnNuevaSubcategoria.addEventListener('click', () => {
+            document.getElementById('form-subcategoria').reset();
+            modalSubcategoria.classList.remove('hidden');
+        });
+    }
+    document.getElementById('btn-cerrar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
+    document.getElementById('btn-cancelar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
+    if (btnGuardarSubcategoria) btnGuardarSubcategoria.addEventListener('click', guardarSubcategoria);
 
     // ---- EVENTOS PEDIDOS / CLIENTES ----
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
@@ -124,7 +140,7 @@ function configurarEventos() {
 }
 
 // ==========================================
-// MÓDULO: CATEGORÍAS (JERARQUÍA ESTRICTA)
+// MÓDULO: CATEGORÍAS Y SUBCATEGORÍAS
 // ==========================================
 
 async function cargarCategorias() {
@@ -135,7 +151,9 @@ async function cargarCategorias() {
         tbody.innerHTML = '';
         selectProdCategoria.innerHTML = '<option value="">Seleccionar categoría...</option>';
         filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
-        categoriasGlobales = []; // Limpiamos caché de categorías
+        selectSubcatParent.innerHTML = '<option value="">Selecciona la categoría principal...</option>'; // Para el modal de subcat
+        
+        categoriasGlobales = [];
 
         if (querySnapshot.empty) {
             tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No hay categorías. Crea una.</td></tr>';
@@ -145,17 +163,16 @@ async function cargarCategorias() {
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
             cat.id = docSnap.id;
-            categoriasGlobales.push(cat); // Guardamos la jerarquía en memoria
+            categoriasGlobales.push(cat); 
 
-            // Formatear las subcategorías para la tabla
             const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) 
-                ? cat.subcategorias.join(', ') 
+                ? cat.subcategorias.map(s => `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-xs mr-1 mb-1">${s}</span>`).join('') 
                 : '<span class="text-gray-400 italic">Sin subcategorías</span>';
 
             tbody.innerHTML += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${cat.nombre}</td>
-                    <td class="p-4 text-gray-600 text-sm">${subcatsTexto}</td>
+                    <td class="p-4 text-gray-600">${subcatsTexto}</td>
                     <td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td>
                     <td class="p-4 text-center">
                         <button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1">
@@ -164,8 +181,11 @@ async function cargarCategorias() {
                     </td>
                 </tr>
             `;
+            
+            // Llenar selectores
             selectProdCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
             filtroCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
+            selectSubcatParent.innerHTML += `<option value="${cat.id}">${cat.nombre}</option>`; // Usa el ID como valor para actualizar fácil
         });
     } catch (error) {
         console.error("Error cargando categorías:", error);
@@ -175,33 +195,67 @@ async function cargarCategorias() {
 async function guardarCategoria() {
     const nombre = document.getElementById('cat-nombre').value.trim();
     const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
-    const subcatsRaw = document.getElementById('cat-subcategorias').value;
 
-    if (!nombre || !subcatsRaw) return alert("El nombre y las subcategorías son obligatorios.");
-
-    // Convertir el texto separado por comas en un Array limpio
-    const subcategorias = subcatsRaw.split(',')
-        .map(s => s.trim()) // Quita espacios extra
-        .filter(s => s !== ""); // Elimina elementos vacíos si puso comas de más
+    if (!nombre) return alert("El nombre es obligatorio.");
 
     btnGuardarCategoria.disabled = true;
     btnGuardarCategoria.innerText = "Guardando...";
 
     try {
-        await addDoc(categoriesCollection, { nombre, icono, subcategorias });
+        // La categoría nace con un arreglo vacío de subcategorías
+        await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] });
         modalCategoria.classList.add('hidden');
-        await cargarCategorias(); // Recargar para actualizar los selects
+        await cargarCategorias(); 
     } catch (error) {
         console.error("Error al guardar categoría:", error);
-        alert("Hubo un error al guardar.");
+        alert("Hubo un error.");
     } finally {
         btnGuardarCategoria.disabled = false;
         btnGuardarCategoria.innerText = "Guardar";
     }
 }
 
+// NUEVO: Función para guardar solo la subcategoría
+async function guardarSubcategoria() {
+    const parentId = document.getElementById('subcat-parent').value;
+    const subName = document.getElementById('subcat-nombre').value.trim();
+
+    if (!parentId || !subName) return alert("Selecciona una categoría padre y escribe un nombre.");
+
+    btnGuardarSubcategoria.disabled = true;
+    btnGuardarSubcategoria.innerText = "Guardando...";
+
+    try {
+        // Buscar la categoría en memoria
+        const categoriaPadre = categoriasGlobales.find(c => c.id === parentId);
+        
+        // Clonar el arreglo existente de subcategorías (o crear uno nuevo si no existe)
+        const nuevasSubcategorias = [...(categoriaPadre.subcategorias || [])];
+        
+        // Evitar duplicados exactos (insensible a mayúsculas/minúsculas)
+        const existe = nuevasSubcategorias.find(s => s.toLowerCase() === subName.toLowerCase());
+        
+        if (!existe) {
+            nuevasSubcategorias.push(subName); // Añadir la nueva
+            await updateDoc(doc(db, "categories", parentId), { subcategorias: nuevasSubcategorias });
+        } else {
+            alert("Esta subcategoría ya existe en esta categoría.");
+        }
+        
+        modalSubcategoria.classList.add('hidden');
+        await cargarCategorias(); // Recargar todo para que se pinten en la tabla y selects
+        
+    } catch (error) {
+        console.error("Error al guardar subcategoría:", error);
+        alert("Hubo un error al guardar.");
+    } finally {
+        btnGuardarSubcategoria.disabled = false;
+        btnGuardarSubcategoria.innerText = "Guardar Subcategoría";
+    }
+}
+
 window.eliminarCategoria = async (id) => {
-    if(confirm("¿Seguro que deseas eliminar esta categoría? Esto podría afectar a los productos que la usan.")) {
+    if(confirm("¿Seguro que deseas eliminar esta categoría? Esto afectará los filtros de la tienda.")) {
         await deleteDoc(doc(db, "categories", id));
         cargarCategorias();
     }
@@ -391,7 +445,7 @@ function dibujarTablaProductos(arreglo) {
     tbody.innerHTML = '';
 
     if (arreglo.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos con estos filtros.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos.</td></tr>';
         return;
     }
 
@@ -424,7 +478,6 @@ function resetearModalProducto(titulo) {
     document.getElementById('prod-descripcion').value = '';
     document.getElementById('prod-stock').value = 1; 
     
-    // Resetear subcategorías
     actualizarSelectSubcategoriasFormulario("");
     
     arrayImagenesUrls = [];
@@ -444,7 +497,6 @@ window.prepararEdicionProd = (id) => {
     document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10;
     document.getElementById('prod-descripcion').value = prod.descripcion || '';
     
-    // CARGAR SUBCATEGORIAS ANTES DE SETEAR EL VALOR
     actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria);
     
     arrayImagenesUrls = [...prod.imagenes];
