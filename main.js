@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.co
 
 let currentUser = null;
 window.productosPublicos = []; 
-let carritoCompras = []; // Arreglo en memoria para el carrito
+let carritoCompras = []; 
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -19,11 +19,9 @@ function initApp() {
     setupLoginModal();
     monitorAuthState();
     
-    // Cargar Catálogo
     cargarCategoriasPublicas();
     cargarProductosPublicos();
     
-    // Iniciar Módulo de Carrito
     cargarCarritoLocal();
     setupModalDetalle();
 }
@@ -69,7 +67,6 @@ function setupLoginModal() {
     const form = document.getElementById('form-login');
     const btnToggle = document.getElementById('btn-toggle-mode');
     
-    // ... [Variables de form omitidas por brevedad, mapeadas abajo] ...
     let isLoginMode = true;
 
     const abrirModal = async () => {
@@ -168,7 +165,7 @@ function setupLoginModal() {
 }
 
 // ==========================================
-// MÓDULO: TIENDA PÚBLICA (CATÁLOGO)
+// MÓDULO: TIENDA PÚBLICA (CATÁLOGO Y FILTROS)
 // ==========================================
 
 async function cargarCategoriasPublicas() {
@@ -185,8 +182,9 @@ async function cargarCategoriasPublicas() {
 
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
+            // ACTUALIZADO: Se añadió el evento onclick para filtrar al presionar la tarjeta
             contenedor.innerHTML += `
-                <a href="#destacados" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 hover:border-brand-blue flex flex-col items-center justify-center">
+                <a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 hover:border-brand-blue flex flex-col items-center justify-center">
                     <i class="${cat.icono} text-5xl mb-3 text-brand-blue"></i>
                     <h3 class="font-semibold text-gray-700">${cat.nombre}</h3>
                 </a>
@@ -203,56 +201,102 @@ async function cargarProductosPublicos() {
 
     try {
         const querySnapshot = await getDocs(collection(db, "products"));
-        contenedor.innerHTML = '';
         window.productosPublicos = []; 
-
-        if (querySnapshot.empty) {
-            contenedor.innerHTML = '<p class="col-span-full text-center text-gray-500">No hay productos disponibles por ahora.</p>';
-            return;
-        }
 
         querySnapshot.forEach((docSnap) => {
             const prod = docSnap.data();
             prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
             prod.stock = prod.stock !== undefined ? prod.stock : 10;
-            window.productosPublicos.push(prod);
-
-            // Si no hay stock, no lo mostramos o lo mostramos agotado
-            if(prod.stock <= 0) return; // Omitimos productos sin stock de la vitrina principal
-
-            const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
-            let imgHTML = imgPortada.startsWith('http') 
-                ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">`
-                : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
-
-            contenedor.innerHTML += `
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col" onclick="abrirModalDetalle('${prod.id}')">
-                    <div class="relative h-64 overflow-hidden bg-gray-50 flex items-center justify-center p-2">
-                        ${imgHTML}
-                        <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span class="bg-white text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all">
-                                <i class="ph ph-eye text-xl"></i> Ver Detalle
-                            </span>
-                        </div>
-                    </div>
-                    <div class="p-5 flex flex-col flex-grow">
-                        <span class="text-xs font-bold text-brand-blue uppercase tracking-wider mb-1">${prod.categoria}</span>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">${prod.nombre}</h3>
-                        <div class="mt-auto flex items-center justify-between">
-                            <span class="text-2xl font-bold text-brand-pink">$${prod.precio.toFixed(2)}</span>
-                            <button class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
-                                <i class="ph ph-shopping-cart text-xl font-bold"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            
+            // Solo guardamos en memoria pública los que tienen stock > 0
+            if(prod.stock > 0) {
+                window.productosPublicos.push(prod);
+            }
         });
+
+        // Dibujar catálogo completo al inicio
+        renderizarCatalogo(window.productosPublicos);
+
     } catch (error) {
         console.error(error);
+        contenedor.innerHTML = '<p class="col-span-full text-center text-red-500">Error al cargar el catálogo.</p>';
     }
 }
+
+// NUEVA FUNCIÓN: Dibuja los productos que le pases como parámetro
+function renderizarCatalogo(productosAMostrar) {
+    const contenedor = document.getElementById('public-products');
+    contenedor.innerHTML = '';
+
+    if (productosAMostrar.length === 0) {
+        contenedor.innerHTML = `
+            <div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400">
+                <i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i>
+                <p class="text-lg">No encontramos productos en esta categoría.</p>
+                <button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button>
+            </div>
+        `;
+        return;
+    }
+
+    productosAMostrar.forEach(prod => {
+        const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
+        let imgHTML = imgPortada.startsWith('http') 
+            ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">`
+            : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
+
+        contenedor.innerHTML += `
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col" onclick="abrirModalDetalle('${prod.id}')">
+                <div class="relative h-64 overflow-hidden bg-gray-50 flex items-center justify-center p-2">
+                    ${imgHTML}
+                    <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="bg-white text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all">
+                            <i class="ph ph-eye text-xl"></i> Ver Detalle
+                        </span>
+                    </div>
+                </div>
+                <div class="p-5 flex flex-col flex-grow">
+                    <span class="text-xs font-bold text-brand-blue uppercase tracking-wider mb-1">${prod.categoria}</span>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">${prod.nombre}</h3>
+                    <div class="mt-auto flex items-center justify-between">
+                        <span class="text-2xl font-bold text-brand-pink">$${prod.precio.toFixed(2)}</span>
+                        <button class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
+                            <i class="ph ph-shopping-cart text-xl font-bold"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// NUEVA FUNCIÓN: Filtra por categoría y cambia el título
+window.filtrarPorCategoria = (categoriaNombre) => {
+    // Filtrar arreglo
+    const filtrados = window.productosPublicos.filter(p => p.categoria === categoriaNombre);
+    
+    // Cambiar Título de la sección
+    const tituloSeccion = document.querySelector('#destacados h2');
+    if (tituloSeccion) {
+        tituloSeccion.innerHTML = `Categoría: <span class="text-brand-pink">${categoriaNombre}</span> 
+        <button onclick="limpiarFiltros()" class="ml-4 align-middle text-sm bg-gray-100 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-full hover:bg-gray-200 transition-colors shadow-sm inline-flex items-center gap-1">
+            <i class="ph ph-x"></i> Ver todo
+        </button>`;
+    }
+    
+    // Dibujar filtrados
+    renderizarCatalogo(filtrados);
+};
+
+// NUEVA FUNCIÓN: Quita los filtros
+window.limpiarFiltros = () => {
+    const tituloSeccion = document.querySelector('#destacados h2');
+    if (tituloSeccion) {
+        tituloSeccion.innerHTML = `Lo Más <span class="text-brand-pink">Nuevo</span>`;
+    }
+    renderizarCatalogo(window.productosPublicos);
+};
 
 // ==========================================
 // LÓGICA DEL MODAL DE DETALLES DEL PRODUCTO
@@ -266,7 +310,7 @@ function setupModalDetalle() {
     const inputQty = document.getElementById('detalle-qty');
     const btnAgregar = document.getElementById('btn-agregar-carrito');
 
-    let currentProductId = null; // Para saber qué producto estamos viendo
+    let currentProductId = null; 
 
     if(btnCerrar) btnCerrar.addEventListener('click', () => modal.classList.add('hidden'));
 
@@ -280,8 +324,6 @@ function setupModalDetalle() {
             if(!currentProductId) return;
             const prod = window.productosPublicos.find(p => p.id === currentProductId);
             let val = parseInt(inputQty.value);
-            
-            // Validar stock antes de sumar
             if(prod && val < prod.stock) {
                 inputQty.value = val + 1;
             } else {
@@ -290,13 +332,12 @@ function setupModalDetalle() {
         });
     }
 
-    // Acción de añadir desde el modal
     if(btnAgregar) {
         btnAgregar.addEventListener('click', () => {
             if(!currentProductId) return;
             const cantidad = parseInt(inputQty.value);
             agregarAlCarritoGlobal(currentProductId, cantidad);
-            modal.classList.add('hidden'); // Cerramos modal de detalle para mostrar el carrito
+            modal.classList.add('hidden'); 
         });
     }
 
@@ -304,7 +345,7 @@ function setupModalDetalle() {
         const prod = window.productosPublicos.find(p => p.id === id);
         if(!prod) return;
 
-        currentProductId = prod.id; // Guardamos ID en memoria
+        currentProductId = prod.id; 
 
         document.getElementById('detalle-categoria').textContent = prod.categoria;
         document.getElementById('detalle-subcategoria').textContent = prod.subcategoria || '';
@@ -312,7 +353,6 @@ function setupModalDetalle() {
         document.getElementById('detalle-precio').textContent = `$${prod.precio.toFixed(2)}`;
         document.getElementById('detalle-descripcion').textContent = prod.descripcion || 'Este producto no tiene una descripción detallada.';
         
-        // Configurar badge de stock
         const badge = document.getElementById('detalle-stock-badge');
         if(prod.stock > 5) {
             badge.className = "text-sm font-medium text-green-500 bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1";
@@ -324,7 +364,6 @@ function setupModalDetalle() {
 
         inputQty.value = 1;
 
-        // Imágenes
         const imgPrincipal = document.getElementById('detalle-img-principal');
         const contMiniaturas = document.getElementById('detalle-miniaturas');
         imgPrincipal.src = '';
@@ -361,60 +400,49 @@ function setupModalDetalle() {
 // MÓDULO: CARRITO DE COMPRAS
 // ==========================================
 
-// Leer memoria del navegador al cargar la página
 function cargarCarritoLocal() {
     const guardado = localStorage.getItem('ds_carrito');
     if(guardado) {
-        try {
-            carritoCompras = JSON.parse(guardado);
-        } catch (e) {
-            carritoCompras = [];
-        }
+        try { carritoCompras = JSON.parse(guardado); } 
+        catch (e) { carritoCompras = []; }
     }
     renderizarCarrito();
 }
 
-// Guardar en memoria del navegador
 function guardarCarritoLocal() {
     localStorage.setItem('ds_carrito', JSON.stringify(carritoCompras));
     renderizarCarrito();
 }
 
-// Función expuesta para que los botones HTML la puedan llamar
 window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
     const productoBase = window.productosPublicos.find(p => p.id === idProducto);
     if(!productoBase) return;
 
-    // Verificar si ya existe en el carrito
     const itemExistente = carritoCompras.find(item => item.id === idProducto);
     
     if (itemExistente) {
-        // Validar si la suma supera el stock
         if(itemExistente.cantidad + cantidadAgregada > productoBase.stock) {
             alert(`No puedes añadir más. Solo tenemos ${productoBase.stock} unidades en stock.`);
             return;
         }
         itemExistente.cantidad += cantidadAgregada;
     } else {
-        // Validar stock inicial
         if(cantidadAgregada > productoBase.stock) {
             alert(`Stock insuficiente. Solo quedan ${productoBase.stock} unidades.`);
             return;
         }
-        // Crear nuevo objeto simplificado para el carrito
         carritoCompras.push({
             id: productoBase.id,
             nombre: productoBase.nombre,
             precio: productoBase.precio,
             imagen: productoBase.imagenes.length > 0 ? productoBase.imagenes[0] : 'https://via.placeholder.com/150',
-            stockMaximo: productoBase.stock, // Guardamos referencia del stock para validar en el panel
+            stockMaximo: productoBase.stock, 
             cantidad: cantidadAgregada
         });
     }
 
     guardarCarritoLocal();
     
-    // Auto-abrir panel del carrito para dar feedback
     const sidebarCart = document.getElementById('cart-sidebar');
     const overlayCart = document.getElementById('cart-overlay');
     if(sidebarCart.classList.contains('translate-x-full')) {
@@ -430,7 +458,7 @@ window.modificarCantidadCarrito = (idProducto, delta) => {
     const nuevaCantidad = item.cantidad + delta;
     
     if(nuevaCantidad <= 0) {
-        eliminarDelCarrito(idProducto); // Si baja de 1, se borra
+        eliminarDelCarrito(idProducto); 
         return;
     }
     
@@ -448,14 +476,12 @@ window.eliminarDelCarrito = (idProducto) => {
     guardarCarritoLocal();
 };
 
-// Dibuja el panel lateral del carrito
 function renderizarCarrito() {
     const contenedor = document.getElementById('cart-items-container');
     const badge = document.getElementById('cart-count');
     const txtTotal = document.getElementById('cart-total');
     const btnPago = document.getElementById('btn-procesar-pago');
 
-    // Calcular totales
     let totalItems = 0;
     let subtotal = 0;
 
@@ -472,7 +498,6 @@ function renderizarCarrito() {
         txtTotal.textContent = '$0.00';
         btnPago.disabled = true;
         
-        // Evento para cerrar desde el botón de vacío
         setTimeout(() => {
             const btnSeguir = document.getElementById('btn-seguir-vacio');
             if(btnSeguir) btnSeguir.addEventListener('click', () => {
