@@ -66,6 +66,9 @@
             <button data-target="vista-clientes" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
                 <i class="ph ph-users text-xl"></i> Clientes
             </button>
+            <button data-target="vista-configuracion" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors mt-4 border-t border-gray-100 pt-4">
+                <i class="ph ph-gear text-xl"></i> Configuración
+            </button>
         </nav>
 
         <div class="p-4 border-t border-gray-200">
@@ -206,6 +209,59 @@
                 </div>
             </div>
 
+            <div id="vista-configuracion" class="vista-seccion hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-700">Configuración de la Tienda</h2>
+                    <button id="btn-guardar-configuracion" class="bg-brand-orange text-white px-6 py-2 rounded-lg font-medium hover:bg-orange-500 transition-colors shadow-sm flex items-center gap-2">
+                        <i class="ph ph-floppy-disk text-xl"></i> Guardar Cambios
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-1">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-blue-50 text-brand-blue flex items-center justify-center text-xl"><i class="ph ph-currency-circle-dollar"></i></div>
+                            <h3 class="font-bold text-gray-800">Tasa de Cambio (BCV)</h3>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-4">Actualiza la tasa oficial para que la tienda calcule los precios en Bolívares correctamente.</p>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Precio de 1 USD en VES (Bs) *</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 transform -translate-y-1/2 font-bold text-gray-500">Bs.</span>
+                                <input type="number" step="0.01" id="config-tasa-bcv" placeholder="Ej: 36.25" class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue font-bold text-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-full bg-orange-50 text-brand-orange flex items-center justify-center text-xl"><i class="ph ph-bank"></i></div>
+                            <h3 class="font-bold text-gray-800">Cuentas y Métodos de Pago</h3>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-4">Estos datos se le mostrarán al cliente en la ventana de pago final.</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Pago Móvil</label>
+                                <textarea id="config-pago-movil" rows="3" placeholder="Ej: Banco Mercantil (0105)&#10;C.I: V-12345678&#10;Teléfono: 0414-1234567" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Transferencia Bancaria</label>
+                                <textarea id="config-transferencia" rows="3" placeholder="Ej: Banco Banesco&#10;Cuenta: 0134-xxxx-xxxx-xxxx&#10;A nombre de: Juan Pérez" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Zelle</label>
+                                <textarea id="config-zelle" rows="3" placeholder="Ej: correo@ejemplo.com&#10;A nombre de: Juan Pérez" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none text-sm"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Binance Pay</label>
+                                <textarea id="config-binance" rows="3" placeholder="Ej: Pay ID: 123456789&#10;Correo: cripto@ejemplo.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none text-sm"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
@@ -220,12 +276,10 @@
                     <form id="form-producto" class="space-y-4">
                         <input type="hidden" id="prod-id">
                         <input type="hidden" id="prod-imagenes-urls" value="[]"> 
-                        
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                             <input type="text" id="prod-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
                         </div>
-                        
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
@@ -248,12 +302,10 @@
                                 <input type="number" id="prod-stock" required min="0" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
                             </div>
                         </div>
-                        
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Descripción del Producto</label>
                             <textarea id="prod-descripcion" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none"></textarea>
                         </div>
-
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Galería de Imágenes *</label>
                             <label for="prod-imagen" class="flex flex-col items-center justify-center w-full h-24 border-2 border-brand-blue border-dashed rounded-xl cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
@@ -278,15 +330,13 @@
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <h3 id="modal-titulo-cat" class="text-lg font-bold text-gray-800">Nueva Categoría Principal</h3>
-                    <button id="btn-cerrar-modal-cat" class="text-gray-400 hover:text-red-500 p-1">
-                        <i class="ph ph-x text-2xl"></i>
-                    </button>
+                    <button id="btn-cerrar-modal-cat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
                 </div>
                 <div class="p-6">
                     <form id="form-categoria" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Categoría *</label>
-                            <input type="text" id="cat-nombre" required placeholder="Ej: Ropa Niños" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
+                            <input type="text" id="cat-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Selecciona un Ícono *</label>
@@ -317,9 +367,7 @@
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <h3 class="text-lg font-bold text-gray-800">Añadir Subcategoría</h3>
-                    <button id="btn-cerrar-modal-subcat" class="text-gray-400 hover:text-red-500 p-1">
-                        <i class="ph ph-x text-2xl"></i>
-                    </button>
+                    <button id="btn-cerrar-modal-subcat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
                 </div>
                 <div class="p-6">
                     <form id="form-subcategoria" class="space-y-4">
@@ -331,13 +379,13 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de Subcategoría *</label>
-                            <input type="text" id="subcat-nombre" required placeholder="Ej: Franelas" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
+                            <input type="text" id="subcat-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
                         </div>
                     </form>
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
                     <button id="btn-cancelar-modal-subcat" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
-                    <button id="btn-guardar-subcategoria" type="button" class="px-5 py-2 bg-brand-blue text-white font-medium hover:bg-blue-500 rounded-lg shadow-sm">Guardar Subcategoría</button>
+                    <button id="btn-guardar-subcategoria" type="button" class="px-5 py-2 bg-brand-blue text-white font-medium hover:bg-blue-500 rounded-lg shadow-sm">Guardar</button>
                 </div>
             </div>
         </div>
@@ -346,9 +394,7 @@
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <h3 class="text-lg font-bold text-gray-800">Actualizar Pedido</h3>
-                    <button id="btn-cerrar-modal-ped" class="text-gray-400 hover:text-red-500 p-1">
-                        <i class="ph ph-x text-2xl"></i>
-                    </button>
+                    <button id="btn-cerrar-modal-ped" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
                 </div>
                 <div class="p-6">
                     <input type="hidden" id="ped-id">
@@ -370,7 +416,6 @@
                 </div>
             </div>
         </div>
-
     </main>
 
     <script>
@@ -396,7 +441,8 @@
                 'vista-productos': 'Gestión de Productos',
                 'vista-categorias': 'Gestión de Categorías',
                 'vista-pedidos': 'Control de Pedidos',
-                'vista-clientes': 'Directorio de Usuarios'
+                'vista-clientes': 'Directorio de Usuarios',
+                'vista-configuracion': 'Configuración de la Tienda' // NUEVO
             };
 
             navBtns.forEach(btn => {
@@ -423,9 +469,9 @@
                 });
             });
 
+            // Control de íconos en modal categoría
             const iconBtns = document.querySelectorAll('.icon-btn');
             const inputIcono = document.getElementById('cat-icono');
-
             if (iconBtns.length > 0) {
                 iconBtns.forEach(btn => {
                     btn.addEventListener('click', () => {
@@ -433,10 +479,8 @@
                             b.classList.remove('border-brand-blue', 'bg-blue-50', 'text-brand-blue');
                             b.classList.add('border-transparent', 'bg-gray-50', 'text-gray-500');
                         });
-                        
                         btn.classList.remove('border-transparent', 'bg-gray-50', 'text-gray-500');
                         btn.classList.add('border-brand-blue', 'bg-blue-50', 'text-brand-blue');
-                        
                         inputIcono.value = btn.getAttribute('data-icon');
                     });
                 });
