@@ -665,16 +665,19 @@ window.abrirModalPedido = (id) => {
     document.getElementById('ped-pago-metodo').textContent = pedido.metodoPago || 'No especificado';
     document.getElementById('ped-pago-referencia').textContent = pedido.referencia || 'N/A';
 
-    const btnComprobante = document.getElementById('ped-btn-comprobante');
+    // LÓGICA DE FOTO INTEGRADA
+    const contComprobante = document.getElementById('ped-contenedor-comprobante');
+    const imgComprobante = document.getElementById('ped-img-comprobante');
+    const enlaceComprobante = document.getElementById('ped-enlace-comprobante');
     const txtNoComprobante = document.getElementById('ped-no-comprobante');
 
     if (pedido.comprobanteUrl && pedido.comprobanteUrl.startsWith('http')) {
-        btnComprobante.href = pedido.comprobanteUrl;
-        btnComprobante.classList.remove('hidden');
+        imgComprobante.src = pedido.comprobanteUrl;
+        enlaceComprobante.href = pedido.comprobanteUrl;
+        contComprobante.classList.remove('hidden');
         txtNoComprobante.classList.add('hidden');
     } else {
-        btnComprobante.classList.add('hidden');
-        btnComprobante.href = '#';
+        contComprobante.classList.add('hidden');
         txtNoComprobante.classList.remove('hidden');
     }
 
