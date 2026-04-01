@@ -113,7 +113,6 @@ function configurarEventos() {
         });
     }
 
-    // Eventos Productos
     btnNuevoProducto.addEventListener('click', () => { resetearModalProducto("Añadir Nuevo Producto"); modalProducto.classList.remove('hidden'); });
     document.getElementById('btn-cerrar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
@@ -125,20 +124,17 @@ function configurarEventos() {
     filtroCategoria.addEventListener('change', () => { actualizarSelectSubcategoriasFiltro(); aplicarFiltrosProductos(); });
     filtroSubcategoria.addEventListener('change', aplicarFiltrosProductos);
 
-    // Eventos Categorías
     btnNuevaCategoria.addEventListener('click', () => { document.getElementById('form-categoria').reset(); modalCategoria.classList.remove('hidden'); });
     document.getElementById('btn-cerrar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
     if (buscadorCategorias) buscadorCategorias.addEventListener('input', aplicarFiltrosCategorias);
 
-    // Eventos Subcategorías
     if (btnNuevaSubcategoria) { btnNuevaSubcategoria.addEventListener('click', () => { document.getElementById('form-subcategoria').reset(); modalSubcategoria.classList.remove('hidden'); }); }
     document.getElementById('btn-cerrar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
     if (btnGuardarSubcategoria) btnGuardarSubcategoria.addEventListener('click', guardarSubcategoria);
 
-    // Eventos Pedidos y Clientes
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
@@ -149,7 +145,6 @@ function configurarEventos() {
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
     if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
 
-    // Eventos Tasas y Pagos
     if (btnGuardarTasas) btnGuardarTasas.addEventListener('click', guardarTasas);
     if (btnNuevoPago) {
         btnNuevoPago.addEventListener('click', () => {
@@ -163,7 +158,6 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-pago').addEventListener('click', () => modalPago.classList.add('hidden'));
     if (btnGuardarPago) btnGuardarPago.addEventListener('click', guardarPago);
 
-    // Eventos Promociones
     if (btnNuevaPromocion) {
         btnNuevaPromocion.addEventListener('click', () => {
             document.getElementById('form-promocion').reset();
@@ -203,8 +197,11 @@ async function cargarTasas() {
             const data = docSnap.data();
             const inputTasaBcv = document.getElementById('config-tasa-bcv');
             const inputTasaCop = document.getElementById('config-tasa-cop');
+            const inputWhatsapp = document.getElementById('config-whatsapp'); // NUEVO
+            
             if (inputTasaBcv) inputTasaBcv.value = data.tasaBcv || '';
             if (inputTasaCop) inputTasaCop.value = data.tasaCop || '';
+            if (inputWhatsapp) inputWhatsapp.value = data.whatsapp || ''; // NUEVO
         }
     } catch (error) { console.error("Error cargando tasas:", error); }
 }
@@ -216,12 +213,14 @@ async function guardarTasas() {
 
     const tasaBcv = parseFloat(document.getElementById('config-tasa-bcv').value) || 0;
     const tasaCop = parseFloat(document.getElementById('config-tasa-cop').value) || 0;
+    const whatsapp = document.getElementById('config-whatsapp').value.trim(); // NUEVO
 
     try {
-        await setDoc(configDocRef, { tasaBcv, tasaCop, fechaActualizacion: new Date().toISOString() }, { merge: true });
-        alert("Tasas actualizadas con éxito.");
+        // ACTUALIZADO: Guarda también el número de WhatsApp
+        await setDoc(configDocRef, { tasaBcv, tasaCop, whatsapp, fechaActualizacion: new Date().toISOString() }, { merge: true });
+        alert("Configuración actualizada con éxito.");
     } catch (error) {
-        console.error("Error al guardar tasas:", error); alert("Error al guardar.");
+        console.error("Error al guardar:", error); alert("Error al guardar.");
     } finally { btnGuardarTasas.disabled = false; btnGuardarTasas.innerHTML = originalText; }
 }
 
@@ -630,10 +629,6 @@ function exportarClientesExcel() {
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
 
-// ==========================================
-// MÓDULO: PEDIDOS (EL SÚPER MODAL)
-// ==========================================
-
 async function cargarPedidos() {
     try { const querySnapshot = await getDocs(ordersCollection); pedidosGlobales = []; querySnapshot.forEach((docSnap) => { const pedido = docSnap.data(); pedido.id = docSnap.id; pedidosGlobales.push(pedido); }); aplicarFiltrosPedidos(); } catch (error) { console.error(error); }
 }
@@ -651,13 +646,10 @@ function dibujarTablaPedidos(arreglo) {
     arreglo.forEach((pedido) => {
         let colorEstado = 'bg-gray-100 text-gray-600';
         if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700'; if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700'; if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700'; if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700'; if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
-        
-        // ACTUALIZADO: Solo pasamos el ID porque el modal ahora busca el resto
         tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
     });
 }
 
-// ACTUALIZACIÓN: LÓGICA DEL SÚPER MODAL
 window.abrirModalPedido = (id) => { 
     const pedido = pedidosGlobales.find(p => p.id === id);
     if(!pedido) return;
@@ -666,12 +658,10 @@ window.abrirModalPedido = (id) => {
     document.getElementById('ped-id-display').textContent = `#${id.slice(-6).toUpperCase()}`;
     document.getElementById('ped-estado').value = pedido.estado; 
     
-    // Llenar Cliente
     document.getElementById('ped-cliente-nombre').textContent = pedido.clienteNombre || 'Sin nombre';
     document.getElementById('ped-cliente-email').textContent = pedido.clienteEmail || 'Sin email';
     document.getElementById('ped-cliente-direccion').textContent = pedido.direccion || 'Sin dirección';
 
-    // Llenar Pago
     document.getElementById('ped-pago-metodo').textContent = pedido.metodoPago || 'No especificado';
     document.getElementById('ped-pago-referencia').textContent = pedido.referencia || 'N/A';
 
@@ -688,7 +678,6 @@ window.abrirModalPedido = (id) => {
         txtNoComprobante.classList.remove('hidden');
     }
 
-    // Llenar Lista de Productos
     const listaProd = document.getElementById('ped-productos-lista');
     listaProd.innerHTML = '';
     if (pedido.productos && pedido.productos.length > 0) {
@@ -708,10 +697,9 @@ window.abrirModalPedido = (id) => {
             `;
         });
     } else {
-        listaProd.innerHTML = '<li class="text-sm text-gray-500 italic text-center py-4">No hay productos guardados en esta orden.</li>';
+        listaProd.innerHTML = '<li class="text-sm text-gray-500 italic text-center py-4">No hay productos en esta orden.</li>';
     }
 
-    // Llenar Totales (Maneja versiones antiguas y nuevas de la BD)
     const totalDolares = pedido.totalUSD || pedido.total || 0;
     document.getElementById('ped-total-usd').textContent = `$${totalDolares.toFixed(2)}`;
     
