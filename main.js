@@ -29,18 +29,18 @@ async function initApp() {
     setupMobileMenu();
     setupLoginModal();
     monitorAuthState();
-    setupLightbox(); // Inicializar el zoom de imágenes
+    setupLightbox(); 
     
     // 1. Cargar configuraciones del Administrador
     await cargarConfiguracionPublica();
     await cargarMetodosPago();
     await cargarPromocionesPublicas();
 
-    // 2. Cargar Catálogo (AWAIT vital para evitar que el carrito se dibuje sin productos en memoria tras un reload)
+    // 2. Cargar Catálogo (AWAIT vital)
     await cargarCategoriasPublicas();
     await cargarProductosPublicos();
     
-    // 3. Inicializar Módulos Locales (Ahora el catálogo ya existe en memoria)
+    // 3. Inicializar Módulos Locales
     cargarCarritoLocal();
     setupModalDetalle();
     setupCheckout(); 
@@ -232,14 +232,47 @@ async function cargarProductosPublicos() {
 }
 
 function renderizarCatalogo(productosAMostrar) {
-    const contenedor = document.getElementById('public-products'); contenedor.innerHTML = '';
+    const contenedor = document.getElementById('public-products'); 
+    contenedor.innerHTML = '';
+    
     if (productosAMostrar.length === 0) {
-        contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`; return;
+        contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`; 
+        return;
     }
+
     productosAMostrar.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
-        let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
-        contenedor.innerHTML += `<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col" onclick="abrirModalDetalle('${prod.id}')"><div class="relative h-64 overflow-hidden bg-gray-50 flex items-center justify-center p-2">${imgHTML}<div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><span class="bg-white text-gray-800 font-bold py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all"><i class="ph ph-eye text-xl"></i> Ver Detalle</span></div></div><div class="p-5 flex flex-col flex-grow"><span class="text-xs font-bold text-brand-blue uppercase tracking-wider mb-1">${prod.categoria}</span><h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">${prod.nombre}</h3><div class="mt-auto flex items-center justify-between"><span class="text-2xl font-bold text-brand-pink">$${prod.precio.toFixed(2)}</span><button class="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);"><i class="ph ph-shopping-cart text-xl font-bold"></i></button></div></div></div>`;
+        let imgHTML = imgPortada.startsWith('http') 
+            ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
+            : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
+            
+        // DISEÑO RESPONSIVO (NUEVO)
+        contenedor.innerHTML += `
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md" onclick="abrirModalDetalle('${prod.id}')">
+                
+                <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
+                    ${imgHTML}
+                    <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="bg-white text-gray-800 font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full shadow-lg flex items-center gap-1 sm:gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all text-xs sm:text-base">
+                            <i class="ph ph-eye sm:text-xl"></i> <span class="hidden sm:inline">Ver Detalle</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="p-3 sm:p-5 flex flex-col flex-grow">
+                    <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
+                    <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
+                    
+                    <div class="mt-auto flex items-center justify-between">
+                        <span class="text-base sm:text-2xl font-black text-brand-pink">$${prod.precio.toFixed(2)}</span>
+                        <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
+                            <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        `;
     });
 }
 
@@ -269,7 +302,6 @@ function setupLightbox() {
         btnCerrarLightbox.addEventListener('click', () => modalLightbox.classList.add('hidden'));
     }
     
-    // Cerrar si hace clic fuera de la imagen
     if(modalLightbox) {
         modalLightbox.addEventListener('click', (e) => {
             if(e.target === modalLightbox) modalLightbox.classList.add('hidden');
@@ -288,7 +320,6 @@ function setupModalDetalle() {
     
     let currentProductId = null; 
 
-    // Al hacer clic en la imagen principal, abrir el Lightbox (Zoom)
     if (imgContainerZoom) {
         imgContainerZoom.addEventListener('click', () => {
             const src = document.getElementById('detalle-img-principal').src;
@@ -322,7 +353,6 @@ function setupModalDetalle() {
     }
 
     window.abrirModalDetalle = (id) => {
-        // Asegurarnos de limpiar IDs de promociones para buscar el producto real
         const idReal = id.replace('_promo', '');
         const prod = window.productosPublicos.find(p => p.id === idReal); 
         if(!prod) return;
@@ -355,9 +385,7 @@ function setupModalDetalle() {
             }
         }
         
-        // Si el carrito está abierto, lo cerramos sutilmente para dar prioridad a la vista del producto
         if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
-        
         modal.classList.remove('hidden');
     };
 
@@ -476,12 +504,11 @@ function renderizarCarrito() {
 
     contenedor.innerHTML = '';
     
-    // 1. Dibujar los productos comprados (CON IMÁGENES Y NOMBRES CLICABLES)
     carritoCompras.forEach(item => {
         totalItems += item.cantidad; subtotalGlobal += (item.precio * item.cantidad);
         
         const estiloOferta = item.id.includes('_promo') ? 'border-brand-blue border-dashed bg-blue-50/50 border-2' : 'border-gray-100 bg-white border';
-        const idReal = item.productoOriginalId || item.id; // Para que el Modal Detalle sepa qué abrir
+        const idReal = item.productoOriginalId || item.id; 
         
         contenedor.innerHTML += `
         <div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative">
@@ -501,10 +528,9 @@ function renderizarCarrito() {
         </div>`;
     });
 
-    // 2. Evaluar y mostrar Banner Promocional (CON IMAGEN Y NOMBRE CLICABLES)
     let promoMostrada = false;
     promocionesPublicas.forEach(promo => {
-        if (promoMostrada) return;
+        if (promoMostrada) return; 
 
         const prodOferta = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
         if (!prodOferta) return;
@@ -659,7 +685,6 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO (ESCUDO DE INVENTARIO ACTIVADO)
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -676,7 +701,6 @@ function setupCheckout() {
             btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
 
             try {
-                // ESCUDO DE INVENTARIO
                 let problemasStock = [];
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
@@ -714,7 +738,6 @@ function setupCheckout() {
 
                 await addDoc(collection(db, "orders"), orderData);
 
-                // Descontar Stock
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
