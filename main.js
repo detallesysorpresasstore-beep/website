@@ -359,7 +359,7 @@ window.agregarPromoAlCarrito = (idProductoOriginal, precioPromo) => {
     carritoCompras.push({
         id: idPromoUnico, 
         productoOriginalId: productoBase.id, 
-        nombre: `🌟 OFERTA: ${productoBase.nombre}`,
+        nombre: `🌟 Promoción: ${productoBase.nombre}`,
         precio: precioPromo,
         imagen: productoBase.imagenes.length > 0 ? productoBase.imagenes[0] : 'https://via.placeholder.com/150',
         stockMaximo: productoBase.stock, 
@@ -402,7 +402,7 @@ window.modificarCantidadCarrito = (idProducto, delta) => {
     if(!item) return;
 
     if(idProducto.includes('_promo') && delta > 0) {
-        alert("Las ofertas especiales están limitadas a 1 unidad."); return;
+        alert("Las ofertas promocionales están limitadas a 1 unidad por compra."); return;
     }
 
     const nuevaCantidad = item.cantidad + delta;
@@ -416,7 +416,7 @@ window.eliminarDelCarrito = (idProducto) => {
     guardarCarritoLocal();
 };
 
-// DIBUJA EL CARRITO Y EVALÚA LAS PROMOS DINÁMICAS (UPSELL IN-CART)
+// DIBUJA EL CARRITO Y EVALÚA LAS PROMOS DINÁMICAS
 function renderizarCarrito() {
     const contenedor = document.getElementById('cart-items-container');
     const badge = document.getElementById('cart-count');
@@ -442,12 +442,14 @@ function renderizarCarrito() {
     // 1. Dibujar los productos comprados
     carritoCompras.forEach(item => {
         totalItems += item.cantidad; subtotalGlobal += (item.precio * item.cantidad);
-        const estiloOferta = item.id.includes('_promo') ? 'border-brand-pink bg-pink-50 border-2' : 'border-gray-100 bg-white border';
+        
+        // Estilo sutil para items de promoción
+        const estiloOferta = item.id.includes('_promo') ? 'border-brand-blue border-dashed bg-blue-50/50 border-2' : 'border-gray-100 bg-white border';
         
         contenedor.innerHTML += `<div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative"><img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50"><div class="flex-1"><h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1">${item.nombre}</h4><p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p><div class="flex items-center gap-3 mt-2"><div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white"><button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button><span class="px-2 text-sm font-bold text-gray-800">${item.cantidad}</span><button onclick="modificarCantidadCarrito('${item.id}', 1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-plus"></i></button></div></div></div><button onclick="eliminarDelCarrito('${item.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded-full"><i class="ph-fill ph-trash text-lg"></i></button></div>`;
     });
 
-    // 2. Evaluar y mostrar Banner Promocional
+    // 2. Evaluar y mostrar Banner Promocional (Estilo Elegante)
     let promoMostrada = false;
     promocionesPublicas.forEach(promo => {
         if (promoMostrada) return; // Solo mostramos 1 banner a la vez
@@ -471,23 +473,29 @@ function renderizarCarrito() {
                 promoMostrada = true;
                 const precioConDescuento = prodOferta.precio * (1 - (promo.porcentajeDescuento / 100));
 
+                // Nuevo diseño súper profesional y nada infantil
                 contenedor.innerHTML += `
-                    <div class="mt-6 bg-pink-50 border-2 border-brand-pink border-dashed rounded-xl p-4 relative mb-2">
-                        <span class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-brand-pink text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm whitespace-nowrap">
-                            🎁 ${promo.nombre}
-                        </span>
-                        <div class="flex items-center gap-3 mt-2">
-                            <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-lg border border-pink-200">
+                    <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 relative mb-2 shadow-sm">
+                        <div class="flex items-start gap-2 mb-2">
+                            <i class="ph-fill ph-check-circle text-green-500 text-lg mt-0.5"></i>
+                            <div>
+                                <p class="text-sm font-bold text-gray-800">¡Excelente! Tu compra califica para esta promoción.</p>
+                                <p class="text-xs text-gray-500">${promo.nombre}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-100 mt-3">
+                            <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-md border border-gray-100">
                             <div class="flex-1">
                                 <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2">${prodOferta.nombre}</h4>
                                 <div class="flex items-baseline gap-2 mt-1">
                                     <span class="text-xs text-gray-400 line-through">$${prodOferta.precio.toFixed(2)}</span>
-                                    <span class="text-lg font-black text-brand-orange">$${precioConDescuento.toFixed(2)}</span>
+                                    <span class="text-lg font-black text-brand-blue">$${precioConDescuento.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
-                        <button onclick="agregarPromoAlCarrito('${prodOferta.id}', ${precioConDescuento})" class="w-full mt-3 bg-brand-pink text-white font-bold text-sm py-2 rounded-lg hover:bg-pink-600 transition-colors shadow-sm flex justify-center items-center gap-2">
-                            <i class="ph-bold ph-plus"></i> Añadir Oferta Especial
+                        <button onclick="agregarPromoAlCarrito('${prodOferta.id}', ${precioConDescuento})" class="w-full mt-3 bg-gray-800 text-white font-bold text-sm py-2.5 rounded-lg hover:bg-gray-700 transition-colors shadow-sm flex justify-center items-center gap-2">
+                            <i class="ph-bold ph-plus-circle"></i> Aprovechar Promoción
                         </button>
                     </div>
                 `;
@@ -502,7 +510,7 @@ function renderizarCarrito() {
 }
 
 // ==========================================
-// MÓDULO: CHECKOUT (PAGOS DINÁMICOS)
+// MÓDULO: CHECKOUT (PAGOS DINÁMICOS Y ESCUDO)
 // ==========================================
 
 function setupCheckout() {
@@ -600,7 +608,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO (ESCUDO DE INVENTARIO ACTIVADO)
+    // CONFIRMAR PEDIDO (CON ESCUDO DE INVENTARIO)
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
