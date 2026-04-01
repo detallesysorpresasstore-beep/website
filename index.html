@@ -229,14 +229,17 @@
         </div>
     </div>
 
-    <div id="modal-detalle-producto" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm">
+    <div id="modal-detalle-producto" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden relative flex flex-col md:flex-row no-scrollbar">
             <button id="btn-cerrar-detalle" class="absolute top-4 right-4 z-10 bg-white/80 backdrop-blur text-gray-500 hover:text-red-500 hover:bg-white rounded-full p-2 shadow-sm transition-all">
                 <i class="ph ph-x text-2xl"></i>
             </button>
             <div class="w-full md:w-1/2 bg-gray-50 p-6 flex flex-col">
-                <div class="w-full aspect-square bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-4 flex items-center justify-center relative">
-                    <img id="detalle-img-principal" src="" alt="Producto" class="w-full h-full object-contain p-2">
+                <div class="w-full aspect-square bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-4 flex items-center justify-center relative group cursor-zoom-in" title="Haz clic para agrandar">
+                    <img id="detalle-img-principal" src="" alt="Producto" class="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300">
+                    <div class="absolute bottom-3 right-3 bg-white/80 backdrop-blur rounded-full p-2 text-gray-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i class="ph ph-corners-out text-xl"></i>
+                    </div>
                 </div>
                 <div id="detalle-miniaturas" class="flex gap-3 overflow-x-auto pb-2 no-scrollbar"></div>
             </div>
@@ -301,17 +304,11 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago *</label>
                         <select id="checkout-metodo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-white">
-                            <option value="">Selecciona cómo vas a pagar...</option>
-                            <option value="Pago Móvil">Pago Móvil</option>
-                            <option value="Transferencia Bancaria">Transferencia Bancaria</option>
-                            <option value="Zelle">Zelle</option>
-                            <option value="Binance">Binance Pay</option>
-                            <option value="Efectivo">Efectivo (Contra Entrega)</option>
+                            <option value="">Cargando métodos de pago...</option>
                         </select>
                     </div>
 
-                    <div id="div-instrucciones-pago" class="hidden bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-gray-700 whitespace-pre-line font-medium">
-                        </div>
+                    <div id="div-instrucciones-pago" class="hidden bg-blue-50 border border-blue-100 p-4 rounded-xl text-sm text-gray-700 whitespace-pre-line font-medium"></div>
 
                     <div id="div-referencia" class="hidden">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Número de Referencia *</label>
@@ -328,7 +325,6 @@
                             <input id="checkout-comprobante" type="file" accept="image/png, image/jpeg, image/webp" class="hidden" />
                         </label>
                     </div>
-
                 </form>
             </div>
 
@@ -339,6 +335,13 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div id="modal-lightbox" class="hidden fixed inset-0 bg-black bg-opacity-95 z-[70] flex items-center justify-center p-4 sm:p-8 backdrop-blur-sm transition-opacity">
+        <button id="btn-cerrar-lightbox" class="absolute top-4 right-4 z-10 text-gray-400 hover:text-white bg-black/50 hover:bg-black rounded-full p-2 transition-all">
+            <i class="ph ph-x text-3xl"></i>
+        </button>
+        <img id="lightbox-img" src="" alt="Zoom Producto" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
     </div>
 
     <script>
