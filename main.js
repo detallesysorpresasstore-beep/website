@@ -16,7 +16,7 @@ let carritoCompras = [];
 let subtotalGlobal = 0; 
 
 // Variables Dinámicas (Configuraciones, Pagos y Promociones)
-let configuracionTienda = { tasaBcv: 1, tasaCop: 1 };
+let configuracionTienda = { tasaBcv: 1, tasaCop: 1, whatsapp: '' };
 let metodosPagoPublicos = [];
 let promocionesPublicas = [];
 let urlComprobantePago = ''; 
@@ -57,6 +57,7 @@ async function cargarConfiguracionPublica() {
             const data = docSnap.data();
             configuracionTienda.tasaBcv = parseFloat(data.tasaBcv) || 1;
             configuracionTienda.tasaCop = parseFloat(data.tasaCop) || 1;
+            configuracionTienda.whatsapp = data.whatsapp || ''; 
         }
     } catch (error) { console.error("Error al cargar configuración:", error); }
 }
@@ -246,10 +247,8 @@ function renderizarCatalogo(productosAMostrar) {
             ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
             : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
             
-        // DISEÑO RESPONSIVO (NUEVO)
         contenedor.innerHTML += `
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md" onclick="abrirModalDetalle('${prod.id}')">
-                
                 <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
                     ${imgHTML}
                     <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -258,11 +257,9 @@ function renderizarCatalogo(productosAMostrar) {
                         </span>
                     </div>
                 </div>
-                
                 <div class="p-3 sm:p-5 flex flex-col flex-grow">
                     <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
                     <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
-                    
                     <div class="mt-auto flex items-center justify-between">
                         <span class="text-base sm:text-2xl font-black text-brand-pink">$${prod.precio.toFixed(2)}</span>
                         <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
@@ -270,7 +267,6 @@ function renderizarCatalogo(productosAMostrar) {
                         </button>
                     </div>
                 </div>
-
             </div>
         `;
     });
@@ -295,7 +291,6 @@ window.limpiarFiltros = () => {
 
 function setupLightbox() {
     const modalLightbox = document.getElementById('modal-lightbox');
-    const lightboxImg = document.getElementById('lightbox-img');
     const btnCerrarLightbox = document.getElementById('btn-cerrar-lightbox');
 
     if(btnCerrarLightbox) {
@@ -685,6 +680,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
+    // CONFIRMAR PEDIDO (CON WHATSAPP Y ESCUDO)
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -701,6 +697,7 @@ function setupCheckout() {
             btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
 
             try {
+                // ESCUDO DE INVENTARIO
                 let problemasStock = [];
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
@@ -736,16 +733,47 @@ function setupCheckout() {
                     fecha: new Date().toISOString()
                 };
 
-                await addDoc(collection(db, "orders"), orderData);
+                const orderRef = await addDoc(collection(db, "orders"), orderData);
 
+                // Descontar Stock
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
                 }
 
+                // ===============================================
+                // GENERAR MENSAJE PARA WHATSAPP
+                // ===============================================
+                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
+                mensajeWa += `🧾 *Orden:* #${orderRef.id.slice(-6).toUpperCase()}\n`;
+                mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
+                mensajeWa += `💵 *Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
+                
+                if (orderData.monedaSecundaria === 'VES' || orderData.monedaSecundaria === 'COP') {
+                     const monedaSimbolo = orderData.monedaSecundaria === 'VES' ? 'Bs.' : '$ COP';
+                     mensajeWa += `🔄 *Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
+                }
+                
+                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Referencia:* ${orderData.referencia}\n`;
+                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante adjunto en el sistema.*\n`;
+                
+                mensajeWa += `\n📍 *Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
+
+                const encodedMensaje = encodeURIComponent(mensajeWa);
+                const numeroWa = configuracionTienda.whatsapp ? configuracionTienda.whatsapp.replace(/\D/g,'') : '';
+
+                // Finalizar compra en la tienda
                 carritoCompras = []; guardarCarritoLocal(); urlComprobantePago = '';
-                alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
-                cerrarCheckout(); window.location.reload(); 
+                
+                if (numeroWa) {
+                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito. Serás redirigido a WhatsApp para confirmar.");
+                    // Redirección infalible a la API oficial de WhatsApp
+                    window.location.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
+                } else {
+                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
+                    cerrarCheckout(); 
+                    window.location.reload(); 
+                }
 
             } catch (error) {
                 console.error("Error procesando pedido:", error); alert("Error al procesar. Intenta nuevamente.");
