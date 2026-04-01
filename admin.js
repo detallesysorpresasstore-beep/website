@@ -3,7 +3,7 @@
  */
 
 import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 
@@ -30,7 +30,7 @@ const modalCategoria = document.getElementById('modal-categoria');
 const btnNuevaCategoria = document.getElementById('btn-nueva-categoria');
 const btnGuardarCategoria = document.getElementById('btn-guardar-categoria');
 
-// NUEVO: Modales y Botones de Subcategorías
+// Modales y Botones de Subcategorías
 const modalSubcategoria = document.getElementById('modal-subcategoria');
 const btnNuevaSubcategoria = document.getElementById('btn-nueva-subcategoria');
 const btnGuardarSubcategoria = document.getElementById('btn-guardar-subcategoria');
@@ -43,11 +43,15 @@ const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
 // Botones de Clientes
 const btnExportarClientes = document.getElementById('btn-exportar-clientes');
 
+// NUEVO: Botón de Configuración
+const btnGuardarConfiguracion = document.getElementById('btn-guardar-configuracion');
+
 // Referencias a Colecciones en Firestore
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
 const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users");
+const configDocRef = doc(db, "config", "store_settings"); // NUEVO: Documento único de configuración
 
 // Variables Globales
 let productosGlobales = [];
@@ -64,7 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarSeguridad();
     configurarEventos();
     
-    // Cargar categorías primero es vital para las relaciones
+    // Cargas iniciales
+    cargarConfiguracion(); // Cargar la tasa y datos bancarios
     cargarCategorias().then(() => {
         cargarProductos();
     });
@@ -104,7 +109,6 @@ function configurarEventos() {
         actualizarSelectSubcategoriasFormulario(e.target.value);
     });
 
-    // Filtros
     buscadorProductos.addEventListener('input', aplicarFiltrosProductos);
     filtroCategoria.addEventListener('change', () => {
         actualizarSelectSubcategoriasFiltro();
@@ -121,7 +125,7 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
 
-    // ---- NUEVO: EVENTOS SUBCATEGORÍAS ----
+    // ---- EVENTOS SUBCATEGORÍAS ----
     if (btnNuevaSubcategoria) {
         btnNuevaSubcategoria.addEventListener('click', () => {
             document.getElementById('form-subcategoria').reset();
@@ -137,6 +141,68 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
+
+    // ---- NUEVO: EVENTOS CONFIGURACIÓN ----
+    if (btnGuardarConfiguracion) btnGuardarConfiguracion.addEventListener('click', guardarConfiguracion);
+}
+
+// ==========================================
+// MÓDULO: CONFIGURACIÓN DE LA TIENDA
+// ==========================================
+
+async function cargarConfiguracion() {
+    try {
+        const docSnap = await getDoc(configDocRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const inputTasa = document.getElementById('config-tasa-bcv');
+            const inputPM = document.getElementById('config-pago-movil');
+            const inputTrans = document.getElementById('config-transferencia');
+            const inputZelle = document.getElementById('config-zelle');
+            const inputBinance = document.getElementById('config-binance');
+
+            if (inputTasa) inputTasa.value = data.tasaBcv || '';
+            if (inputPM) inputPM.value = data.pagoMovil || '';
+            if (inputTrans) inputTrans.value = data.transferencia || '';
+            if (inputZelle) inputZelle.value = data.zelle || '';
+            if (inputBinance) inputBinance.value = data.binance || '';
+        }
+    } catch (error) {
+        console.error("Error cargando configuración:", error);
+    }
+}
+
+async function guardarConfiguracion() {
+    if(!btnGuardarConfiguracion) return;
+    const originalText = btnGuardarConfiguracion.innerHTML;
+    btnGuardarConfiguracion.disabled = true;
+    btnGuardarConfiguracion.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Guardando...';
+
+    const tasaBcv = parseFloat(document.getElementById('config-tasa-bcv').value) || 0;
+    const pagoMovil = document.getElementById('config-pago-movil').value.trim();
+    const transferencia = document.getElementById('config-transferencia').value.trim();
+    const zelle = document.getElementById('config-zelle').value.trim();
+    const binance = document.getElementById('config-binance').value.trim();
+
+    try {
+        // Usamos { merge: true } para crear el documento si no existe, o actualizarlo si ya existe
+        await setDoc(configDocRef, {
+            tasaBcv: tasaBcv,
+            pagoMovil: pagoMovil,
+            transferencia: transferencia,
+            zelle: zelle,
+            binance: binance,
+            fechaActualizacion: new Date().toISOString()
+        }, { merge: true });
+        
+        alert("¡Configuración de la tienda guardada con éxito!");
+    } catch (error) {
+        console.error("Error al guardar configuración:", error);
+        alert("Ocurrió un error al guardar. Verifica los permisos de Firebase.");
+    } finally {
+        btnGuardarConfiguracion.disabled = false;
+        btnGuardarConfiguracion.innerHTML = originalText;
+    }
 }
 
 // ==========================================
@@ -145,14 +211,12 @@ function configurarEventos() {
 
 async function cargarCategorias() {
     const tbody = document.getElementById('admin-categories-list');
-    
     try {
         const querySnapshot = await getDocs(categoriesCollection);
         tbody.innerHTML = '';
         selectProdCategoria.innerHTML = '<option value="">Seleccionar categoría...</option>';
         filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
-        selectSubcatParent.innerHTML = '<option value="">Selecciona la categoría principal...</option>'; // Para el modal de subcat
-        
+        selectSubcatParent.innerHTML = '<option value="">Selecciona la categoría principal...</option>'; 
         categoriasGlobales = [];
 
         if (querySnapshot.empty) {
@@ -181,41 +245,29 @@ async function cargarCategorias() {
                     </td>
                 </tr>
             `;
-            
-            // Llenar selectores
             selectProdCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
             filtroCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
-            selectSubcatParent.innerHTML += `<option value="${cat.id}">${cat.nombre}</option>`; // Usa el ID como valor para actualizar fácil
+            selectSubcatParent.innerHTML += `<option value="${cat.id}">${cat.nombre}</option>`; 
         });
-    } catch (error) {
-        console.error("Error cargando categorías:", error);
-    }
+    } catch (error) { console.error("Error cargando categorías:", error); }
 }
 
 async function guardarCategoria() {
     const nombre = document.getElementById('cat-nombre').value.trim();
     const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
-
     if (!nombre) return alert("El nombre es obligatorio.");
 
     btnGuardarCategoria.disabled = true;
     btnGuardarCategoria.innerText = "Guardando...";
 
     try {
-        // La categoría nace con un arreglo vacío de subcategorías
         await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] });
         modalCategoria.classList.add('hidden');
         await cargarCategorias(); 
-    } catch (error) {
-        console.error("Error al guardar categoría:", error);
-        alert("Hubo un error.");
-    } finally {
-        btnGuardarCategoria.disabled = false;
-        btnGuardarCategoria.innerText = "Guardar";
-    }
+    } catch (error) { alert("Hubo un error."); } 
+    finally { btnGuardarCategoria.disabled = false; btnGuardarCategoria.innerText = "Guardar"; }
 }
 
-// NUEVO: Función para guardar solo la subcategoría
 async function guardarSubcategoria() {
     const parentId = document.getElementById('subcat-parent').value;
     const subName = document.getElementById('subcat-nombre').value.trim();
@@ -226,32 +278,19 @@ async function guardarSubcategoria() {
     btnGuardarSubcategoria.innerText = "Guardando...";
 
     try {
-        // Buscar la categoría en memoria
         const categoriaPadre = categoriasGlobales.find(c => c.id === parentId);
-        
-        // Clonar el arreglo existente de subcategorías (o crear uno nuevo si no existe)
         const nuevasSubcategorias = [...(categoriaPadre.subcategorias || [])];
-        
-        // Evitar duplicados exactos (insensible a mayúsculas/minúsculas)
         const existe = nuevasSubcategorias.find(s => s.toLowerCase() === subName.toLowerCase());
         
         if (!existe) {
-            nuevasSubcategorias.push(subName); // Añadir la nueva
+            nuevasSubcategorias.push(subName);
             await updateDoc(doc(db, "categories", parentId), { subcategorias: nuevasSubcategorias });
-        } else {
-            alert("Esta subcategoría ya existe en esta categoría.");
-        }
+        } else { alert("Esta subcategoría ya existe en esta categoría."); }
         
         modalSubcategoria.classList.add('hidden');
-        await cargarCategorias(); // Recargar todo para que se pinten en la tabla y selects
-        
-    } catch (error) {
-        console.error("Error al guardar subcategoría:", error);
-        alert("Hubo un error al guardar.");
-    } finally {
-        btnGuardarSubcategoria.disabled = false;
-        btnGuardarSubcategoria.innerText = "Guardar Subcategoría";
-    }
+        await cargarCategorias(); 
+    } catch (error) { alert("Hubo un error al guardar."); } 
+    finally { btnGuardarSubcategoria.disabled = false; btnGuardarSubcategoria.innerText = "Guardar Subcategoría"; }
 }
 
 window.eliminarCategoria = async (id) => {
@@ -268,50 +307,35 @@ window.eliminarCategoria = async (id) => {
 function actualizarSelectSubcategoriasFormulario(categoriaNombre, subcategoriaSeleccionada = "") {
     const selectSub = document.getElementById('prod-subcategoria');
     selectSub.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
-    
     if (!categoriaNombre) {
-        selectSub.disabled = true;
-        selectSub.classList.add('bg-gray-50', 'text-gray-500');
+        selectSub.disabled = true; selectSub.classList.add('bg-gray-50', 'text-gray-500');
         return;
     }
-
     const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === categoriaNombre);
-    
     if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
-        selectSub.disabled = false;
-        selectSub.classList.remove('bg-gray-50', 'text-gray-500');
-        
+        selectSub.disabled = false; selectSub.classList.remove('bg-gray-50', 'text-gray-500');
         categoriaEncontrada.subcategorias.forEach(sub => {
             const selected = (sub === subcategoriaSeleccionada) ? 'selected' : '';
             selectSub.innerHTML += `<option value="${sub}" ${selected}>${sub}</option>`;
         });
     } else {
-        selectSub.disabled = true;
-        selectSub.innerHTML = '<option value="">No hay subcategorías registradas</option>';
+        selectSub.disabled = true; selectSub.innerHTML = '<option value="">No hay subcategorías registradas</option>';
     }
 }
 
 function actualizarSelectSubcategoriasFiltro() {
     const catFiltro = filtroCategoria.value;
     filtroSubcategoria.innerHTML = '<option value="">Todas las Subcategorías</option>';
-    
     if (catFiltro === "") {
-        filtroSubcategoria.disabled = true;
-        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+        filtroSubcategoria.disabled = true; filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
         return;
     }
-
     const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === catFiltro);
-    
     if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
-        filtroSubcategoria.disabled = false;
-        filtroSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
-        categoriaEncontrada.subcategorias.forEach(sub => {
-            filtroSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`;
-        });
+        filtroSubcategoria.disabled = false; filtroSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
+        categoriaEncontrada.subcategorias.forEach(sub => { filtroSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`; });
     } else {
-        filtroSubcategoria.disabled = true;
-        filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+        filtroSubcategoria.disabled = true; filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
     }
 }
 
@@ -322,26 +346,19 @@ function actualizarSelectSubcategoriasFiltro() {
 async function manejarSubidaMultiplesImagenes(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-
     btnGuardarProducto.disabled = true;
     const textoOriginal = btnGuardarProducto.innerText;
-    
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         btnGuardarProducto.innerText = `Subiendo ${i + 1}/${files.length}...`;
         try {
-            const formData = new FormData();
-            formData.append('image', file);
+            const formData = new FormData(); formData.append('image', file);
             const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
             const data = await response.json();
-            if (data.success) {
-                arrayImagenesUrls.push(data.data.url);
-                renderizarGaleria();
-            }
+            if (data.success) { arrayImagenesUrls.push(data.data.url); renderizarGaleria(); }
         } catch (error) { console.error("Error en ImgBB:", error); }
     }
-    btnGuardarProducto.disabled = false;
-    btnGuardarProducto.innerText = textoOriginal;
+    btnGuardarProducto.disabled = false; btnGuardarProducto.innerText = textoOriginal;
     document.getElementById('prod-imagen').value = ''; 
 }
 
@@ -349,21 +366,10 @@ function renderizarGaleria() {
     const galeria = document.getElementById('galeria-preview');
     galeria.innerHTML = '';
     arrayImagenesUrls.forEach((url, index) => {
-        galeria.innerHTML += `
-            <div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square">
-                <img src="${url}" class="w-full h-full object-cover">
-                <button type="button" onclick="quitarImagen(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <i class="ph ph-x text-xs"></i>
-                </button>
-            </div>
-        `;
+        galeria.innerHTML += `<div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square"><img src="${url}" class="w-full h-full object-cover"><button type="button" onclick="quitarImagen(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-x text-xs"></i></button></div>`;
     });
 }
-
-window.quitarImagen = (index) => {
-    arrayImagenesUrls.splice(index, 1);
-    renderizarGaleria();
-};
+window.quitarImagen = (index) => { arrayImagenesUrls.splice(index, 1); renderizarGaleria(); };
 
 async function guardarProducto() {
     const id = document.getElementById('prod-id').value;
@@ -377,51 +383,31 @@ async function guardarProducto() {
     if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
         return alert("Completa los datos obligatorios (incluyendo subcategoría) y sube al menos una foto.");
     }
-
-    btnGuardarProducto.disabled = true;
-    btnGuardarProducto.innerText = "Guardando...";
+    btnGuardarProducto.disabled = true; btnGuardarProducto.innerText = "Guardando...";
 
     try {
-        const datos = { 
-            nombre, categoria, subcategoria, precio, stock, descripcion,
-            imagenes: arrayImagenesUrls, 
-            fechaActualizacion: new Date().toISOString() 
-        };
-        
+        const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
         if (id) await updateDoc(doc(db, "products", id), datos);
-        else {
-            datos.fechaCreacion = new Date().toISOString();
-            await addDoc(productsCollection, datos);
-        }
-        modalProducto.classList.add('hidden');
-        cargarProductos();
-    } catch (error) {
-        console.error(error);
-    } finally {
-        btnGuardarProducto.disabled = false;
-        btnGuardarProducto.innerText = "Guardar Producto";
-    }
+        else { datos.fechaCreacion = new Date().toISOString(); await addDoc(productsCollection, datos); }
+        modalProducto.classList.add('hidden'); cargarProductos();
+    } catch (error) { console.error(error); } 
+    finally { btnGuardarProducto.disabled = false; btnGuardarProducto.innerText = "Guardar Producto"; }
 }
 
 async function cargarProductos() {
     const tbody = document.getElementById('admin-products-list');
     tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center"><i class="ph ph-spinner animate-spin text-2xl"></i> Cargando...</td></tr>';
-
     try {
         const querySnapshot = await getDocs(productsCollection);
         productosGlobales = [];
-        
         querySnapshot.forEach((docSnap) => {
-            const prod = docSnap.data();
-            prod.id = docSnap.id;
+            const prod = docSnap.data(); prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
             prod.stock = prod.stock !== undefined ? prod.stock : 10; 
             prod.subcategoria = prod.subcategoria || 'General';
             productosGlobales.push(prod);
         });
-
         aplicarFiltrosProductos();
-
     } catch (error) { console.error(error); }
 }
 
@@ -429,118 +415,64 @@ function aplicarFiltrosProductos() {
     const textoBuscador = buscadorProductos.value.toLowerCase();
     const catFiltro = filtroCategoria.value;
     const subCatFiltro = filtroSubcategoria.value;
-
     productosFiltrados = productosGlobales.filter(prod => {
         const coincideTexto = prod.nombre.toLowerCase().includes(textoBuscador);
         const coincideCat = catFiltro === "" || prod.categoria === catFiltro;
         const coincideSubCat = subCatFiltro === "" || prod.subcategoria === subCatFiltro;
         return coincideTexto && coincideCat && coincideSubCat;
     });
-
     dibujarTablaProductos(productosFiltrados);
 }
 
 function dibujarTablaProductos(arreglo) {
     const tbody = document.getElementById('admin-products-list');
     tbody.innerHTML = '';
-
-    if (arreglo.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos.</td></tr>';
-        return;
-    }
-
+    if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos.</td></tr>'; return; }
     arreglo.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
         let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
         const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
-
-        tbody.innerHTML += `
-            <tr class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td>
-                <td class="p-4">
-                    <span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span>
-                    <br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span>
-                </td>
-                <td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td>
-                <td class="p-4 ${stockColor}">${prod.stock} unds</td>
-                <td class="p-4 text-center">
-                    <button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button>
-                    <button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button>
-                </td>
-            </tr>
-        `;
+        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
 }
 
 function resetearModalProducto(titulo) {
-    document.getElementById('form-producto').reset();
-    document.getElementById('prod-id').value = '';
-    document.getElementById('prod-descripcion').value = '';
-    document.getElementById('prod-stock').value = 1; 
-    
-    actualizarSelectSubcategoriasFormulario("");
-    
-    arrayImagenesUrls = [];
-    renderizarGaleria();
-    document.getElementById('modal-titulo').innerText = titulo;
+    document.getElementById('form-producto').reset(); document.getElementById('prod-id').value = '';
+    document.getElementById('prod-descripcion').value = ''; document.getElementById('prod-stock').value = 1; 
+    actualizarSelectSubcategoriasFormulario(""); arrayImagenesUrls = []; renderizarGaleria(); document.getElementById('modal-titulo').innerText = titulo;
 }
 
 window.prepararEdicionProd = (id) => {
-    const prod = productosGlobales.find(p => p.id === id);
-    if (!prod) return;
-    
+    const prod = productosGlobales.find(p => p.id === id); if (!prod) return;
     resetearModalProducto("Editar Producto");
-    document.getElementById('prod-id').value = prod.id;
-    document.getElementById('prod-nombre').value = prod.nombre;
-    document.getElementById('prod-categoria').value = prod.categoria;
-    document.getElementById('prod-precio').value = prod.precio;
-    document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10;
-    document.getElementById('prod-descripcion').value = prod.descripcion || '';
-    
+    document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre;
+    document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio;
+    document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || '';
     actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria);
-    
-    arrayImagenesUrls = [...prod.imagenes];
-    renderizarGaleria();
-    modalProducto.classList.remove('hidden');
+    arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); modalProducto.classList.remove('hidden');
 };
 
-window.eliminarProducto = async (id) => {
-    if(confirm("¿Seguro que deseas eliminar este producto?")) {
-        await deleteDoc(doc(db, "products", id));
-        cargarProductos();
-    }
-};
+window.eliminarProducto = async (id) => { if(confirm("¿Seguro que deseas eliminar este producto?")) { await deleteDoc(doc(db, "products", id)); cargarProductos(); } };
 
 function exportarProductosExcel() {
     if (productosFiltrados.length === 0) return alert("No hay productos para exportar en esta vista.");
     const datosLimpios = productosFiltrados.map(p => ({
         "ID Producto": p.id, "Nombre": p.nombre, "Categoría": p.categoria, "Subcategoría": p.subcategoria,
-        "Precio ($)": p.precio, "Stock Físico": p.stock, "Descripción": p.descripcion || 'N/A',
-        "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0,
-        "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A'
+        "Precio ($)": p.precio, "Stock Físico": p.stock, "Descripción": p.descripcion || 'N/A', "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0, "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A'
     }));
-    const hoja = XLSX.utils.json_to_sheet(datosLimpios);
-    const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, "Inventario");
-    XLSX.writeFile(libro, "Inventario_Filtrado_D&S.xlsx");
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Inventario"); XLSX.writeFile(libro, "Inventario_Filtrado_D&S.xlsx");
 }
 
 // ==========================================
-// MÓDULOS RESTANTES (Clientes y Pedidos sin cambios)
+// MÓDULOS RESTANTES (Clientes y Pedidos)
 // ==========================================
 async function cargarClientes() {
     const tbody = document.getElementById('admin-clients-list');
     try {
-        const querySnapshot = await getDocs(usersCollection);
-        tbody.innerHTML = '';
-        clientesGlobales = []; 
-        if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>';
-            return;
-        }
+        const querySnapshot = await getDocs(usersCollection); tbody.innerHTML = ''; clientesGlobales = []; 
+        if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>'; return; }
         querySnapshot.forEach((docSnap) => {
-            const user = docSnap.data();
-            clientesGlobales.push(user);
+            const user = docSnap.data(); clientesGlobales.push(user);
             const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
             const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
             const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
@@ -552,28 +484,18 @@ async function cargarClientes() {
 function exportarClientesExcel() {
     if (clientesGlobales.length === 0) return alert("No hay clientes para exportar.");
     const datosLimpios = clientesGlobales.map(c => ({
-        "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A',
-        "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente',
-        "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
+        "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A', "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente', "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
     }));
-    const hoja = XLSX.utils.json_to_sheet(datosLimpios);
-    const libro = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(libro, hoja, "Directorio");
-    XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
 }
 
 async function cargarPedidos() {
     const tbody = document.getElementById('admin-orders-list');
     try {
-        const querySnapshot = await getDocs(ordersCollection);
-        tbody.innerHTML = '';
-        if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Aún no hay pedidos en la tienda.</td></tr>';
-            return;
-        }
+        const querySnapshot = await getDocs(ordersCollection); tbody.innerHTML = '';
+        if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Aún no hay pedidos en la tienda.</td></tr>'; return; }
         querySnapshot.forEach((docSnap) => {
-            const pedido = docSnap.data();
-            const id = docSnap.id;
+            const pedido = docSnap.data(); const id = docSnap.id;
             let colorEstado = 'bg-gray-100 text-gray-600';
             if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700';
             if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700';
@@ -586,22 +508,14 @@ async function cargarPedidos() {
 }
 
 window.abrirModalPedido = (id, estadoActual) => {
-    document.getElementById('ped-id').value = id;
-    document.getElementById('ped-estado').value = estadoActual;
-    modalPedido.classList.remove('hidden');
+    document.getElementById('ped-id').value = id; document.getElementById('ped-estado').value = estadoActual; modalPedido.classList.remove('hidden');
 };
 
 async function actualizarEstadoPedido() {
-    const id = document.getElementById('ped-id').value;
-    const nuevoEstado = document.getElementById('ped-estado').value;
-    btnGuardarPedido.disabled = true;
-    btnGuardarPedido.innerText = "Actualizando...";
+    const id = document.getElementById('ped-id').value; const nuevoEstado = document.getElementById('ped-estado').value;
+    btnGuardarPedido.disabled = true; btnGuardarPedido.innerText = "Actualizando...";
     try {
         await updateDoc(doc(db, "orders", id), { estado: nuevoEstado });
-        modalPedido.classList.add('hidden');
-        cargarPedidos();
-    } catch (error) { alert("Error al actualizar."); } finally {
-        btnGuardarPedido.disabled = false;
-        btnGuardarPedido.innerText = "Actualizar Estado";
-    }
+        modalPedido.classList.add('hidden'); cargarPedidos();
+    } catch (error) { alert("Error al actualizar."); } finally { btnGuardarPedido.disabled = false; btnGuardarPedido.innerText = "Actualizar Estado"; }
 }
