@@ -335,7 +335,77 @@
         
         <div id="modal-subcategoria" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"><div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col"><div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 class="text-lg font-bold text-gray-800">Añadir Subcategoría</h3><button id="btn-cerrar-modal-subcat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button></div><div class="p-6"><form id="form-subcategoria" class="space-y-4"><div><label class="block text-sm font-medium text-gray-700 mb-1">Categoría Padre *</label><select id="subcat-parent" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-white"><option value="">Cargando...</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre de Subcategoría *</label><input type="text" id="subcat-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div></form></div><div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3"><button id="btn-cancelar-modal-subcat" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button><button id="btn-guardar-subcategoria" type="button" class="px-5 py-2 bg-brand-blue text-white font-medium hover:bg-blue-500 rounded-lg shadow-sm">Guardar</button></div></div></div>
 
-        <div id="modal-pedido" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"><div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col"><div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 class="text-lg font-bold text-gray-800">Actualizar Pedido</h3><button id="btn-cerrar-modal-ped" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button></div><div class="p-6"><input type="hidden" id="ped-id"><p class="text-sm text-gray-600 mb-4">Actualiza el estado de la orden para notificar al cliente.</p><div><label class="block text-sm font-medium text-gray-700 mb-1">Estado de la Orden *</label><select id="ped-estado" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-white"><option value="Pendiente">Pendiente (Por pagar/revisar)</option><option value="Procesando">Procesando (Preparando paquete)</option><option value="Enviado">Enviado (En camino)</option><option value="Entregado">Entregado (Finalizado)</option><option value="Cancelado">Cancelado</option></select></div></div><div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3"><button id="btn-cancelar-modal-ped" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button><button id="btn-guardar-pedido" type="button" class="px-5 py-2 bg-brand-blue text-white font-medium hover:bg-blue-500 rounded-lg shadow-sm">Actualizar Estado</button></div></div></div>
+        <div id="modal-pedido" class="hidden absolute inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <i class="ph-fill ph-receipt text-brand-blue text-2xl"></i> Detalle del Pedido <span id="ped-id-display" class="text-brand-orange ml-2 font-mono text-lg"></span>
+                    </h3>
+                    <button id="btn-cerrar-modal-ped" class="text-gray-400 hover:text-red-500 transition-colors p-1">
+                        <i class="ph ph-x text-2xl"></i>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto no-scrollbar flex flex-col md:flex-row gap-6">
+                    <input type="hidden" id="ped-id">
+                    
+                    <div class="w-full md:w-1/3 space-y-6">
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <label class="block text-sm font-bold text-brand-blue mb-2 uppercase tracking-wide">Estado de la Orden</label>
+                            <select id="ped-estado" class="w-full px-4 py-2 border border-blue-200 rounded-lg focus:outline-none focus:border-brand-blue bg-white font-medium text-gray-700">
+                                <option value="Pendiente">Pendiente (Por revisar)</option>
+                                <option value="Procesando">Procesando (Empacando)</option>
+                                <option value="Enviado">Enviado (En camino)</option>
+                                <option value="Entregado">Entregado (Finalizado)</option>
+                                <option value="Cancelado">Cancelado</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3 text-sm uppercase">Cliente y Envío</h4>
+                            <p class="text-sm text-gray-600 mb-1"><i class="ph-fill ph-user text-gray-400 mr-1"></i> <span id="ped-cliente-nombre" class="font-medium text-gray-800"></span></p>
+                            <p class="text-sm text-gray-600 mb-1"><i class="ph-fill ph-envelope text-gray-400 mr-1"></i> <span id="ped-cliente-email"></span></p>
+                            <div class="mt-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Dirección:</p>
+                                <p id="ped-cliente-direccion" class="text-sm text-gray-700"></p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3 text-sm uppercase">Información de Pago</h4>
+                            <p class="text-sm text-gray-600 mb-1"><span class="font-medium">Método:</span> <span id="ped-pago-metodo" class="bg-gray-100 px-2 py-0.5 rounded text-xs font-bold text-gray-700"></span></p>
+                            <p class="text-sm text-gray-600 mb-3"><span class="font-medium">Referencia:</span> <span id="ped-pago-referencia" class="font-mono"></span></p>
+                            
+                            <a id="ped-btn-comprobante" href="#" target="_blank" class="hidden w-full bg-brand-orange text-white font-bold text-sm py-2 rounded-lg hover:bg-orange-500 transition-colors shadow-sm flex justify-center items-center gap-2">
+                                <i class="ph-bold ph-image"></i> Ver Comprobante
+                            </a>
+                            <p id="ped-no-comprobante" class="hidden text-xs text-gray-400 italic text-center mt-2">Sin comprobante adjunto</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full md:w-2/3 flex flex-col">
+                        <h4 class="font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3 text-sm uppercase">Productos Comprados</h4>
+                        <div class="flex-1 bg-gray-50 rounded-xl border border-gray-200 p-4 overflow-y-auto max-h-[400px]">
+                            <ul id="ped-productos-lista" class="space-y-3">
+                                </ul>
+                        </div>
+                        
+                        <div class="mt-4 bg-white border border-gray-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
+                            <span class="font-bold text-gray-600 uppercase text-sm">Total a cobrar:</span>
+                            <div class="text-right">
+                                <p id="ped-total-usd" class="text-2xl font-black text-brand-pink"></p>
+                                <p id="ped-total-secundario" class="text-sm font-medium text-gray-500"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                    <button id="btn-cancelar-modal-ped" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cerrar</button>
+                    <button id="btn-guardar-pedido" type="button" class="px-5 py-2 bg-brand-blue text-white font-bold hover:bg-blue-600 rounded-lg shadow-sm flex items-center gap-2">
+                        <i class="ph-bold ph-floppy-disk"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div id="modal-pago" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
