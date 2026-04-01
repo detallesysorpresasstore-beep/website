@@ -8,14 +8,12 @@ import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment 
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 
-// Variables de Estado del Usuario y Carrito
 let currentUser = null;
 let currentUserData = null; 
 window.productosPublicos = []; 
 let carritoCompras = []; 
 let subtotalGlobal = 0; 
 
-// Variables Dinámicas (Configuraciones, Pagos y Promociones)
 let configuracionTienda = { tasaBcv: 1, tasaCop: 1, whatsapp: '' };
 let metodosPagoPublicos = [];
 let promocionesPublicas = [];
@@ -31,16 +29,13 @@ async function initApp() {
     monitorAuthState();
     setupLightbox(); 
     
-    // 1. Cargar configuraciones del Administrador
     await cargarConfiguracionPublica();
     await cargarMetodosPago();
     await cargarPromocionesPublicas();
 
-    // 2. Cargar Catálogo (AWAIT vital)
     await cargarCategoriasPublicas();
     await cargarProductosPublicos();
     
-    // 3. Inicializar Módulos Locales
     cargarCarritoLocal();
     setupModalDetalle();
     setupCheckout(); 
@@ -296,7 +291,6 @@ function setupLightbox() {
     if(btnCerrarLightbox) {
         btnCerrarLightbox.addEventListener('click', () => modalLightbox.classList.add('hidden'));
     }
-    
     if(modalLightbox) {
         modalLightbox.addEventListener('click', (e) => {
             if(e.target === modalLightbox) modalLightbox.classList.add('hidden');
@@ -582,7 +576,7 @@ function renderizarCarrito() {
 }
 
 // ==========================================
-// MÓDULO: CHECKOUT (PAGOS DINÁMICOS Y ESCUDO)
+// MÓDULO: CHECKOUT (PAGOS, ESCUDO Y WHATSAPP)
 // ==========================================
 
 function setupCheckout() {
@@ -667,8 +661,16 @@ function setupCheckout() {
                 const formData = new FormData(); formData.append('image', file);
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) { urlComprobantePago = data.data.url; textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; }
-            } catch (error) { textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error. Intenta de nuevo'; inputComprobante.value = ''; } 
+                if (data.success) { 
+                    urlComprobantePago = data.data.url; 
+                    textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; 
+                } else {
+                    throw new Error("ImgBB Error");
+                }
+            } catch (error) { 
+                textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error (Imagen muy pesada)'; 
+                inputComprobante.value = ''; 
+            } 
             finally { btnConfirmar.disabled = false; }
         });
     }
@@ -680,7 +682,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO (CON WHATSAPP Y ESCUDO)
+    // CONFIRMAR PEDIDO
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -694,7 +696,7 @@ function setupCheckout() {
             if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return alert("Debes subir la foto (capture) del pago.");
 
             const originalText = btnConfirmar.innerHTML;
-            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
+            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Procesando...';
 
             try {
                 // ESCUDO DE INVENTARIO
@@ -712,7 +714,7 @@ function setupCheckout() {
                     btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText; return; 
                 }
 
-                btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando Compra...';
+                btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando...';
 
                 let totalFinalUSD = subtotalGlobal;
                 if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
@@ -735,44 +737,47 @@ function setupCheckout() {
 
                 const orderRef = await addDoc(collection(db, "orders"), orderData);
 
-                // Descontar Stock
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
                 }
 
-                // ===============================================
-                // GENERAR MENSAJE PARA WHATSAPP
-                // ===============================================
-                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
+                // MENSAJE WA
+                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido. 🛍️\n\n`;
                 mensajeWa += `🧾 *Orden:* #${orderRef.id.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
-                mensajeWa += `💵 *Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
+                mensajeWa += `💵 *Total:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
                 
                 if (orderData.monedaSecundaria === 'VES' || orderData.monedaSecundaria === 'COP') {
                      const monedaSimbolo = orderData.monedaSecundaria === 'VES' ? 'Bs.' : '$ COP';
                      mensajeWa += `🔄 *Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
                 }
                 
-                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Referencia:* ${orderData.referencia}\n`;
-                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante adjunto en el sistema.*\n`;
+                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Ref:* ${orderData.referencia}\n`;
+                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante guardado en la web.*\n`;
                 
-                mensajeWa += `\n📍 *Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
+                mensajeWa += `\n📍 *Dir:* ${orderData.direccion}`;
 
                 const encodedMensaje = encodeURIComponent(mensajeWa);
                 const numeroWa = configuracionTienda.whatsapp ? configuracionTienda.whatsapp.replace(/\D/g,'') : '';
 
-                // Finalizar compra en la tienda
                 carritoCompras = []; guardarCarritoLocal(); urlComprobantePago = '';
                 
                 if (numeroWa) {
-                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito. Serás redirigido a WhatsApp para confirmar.");
-                    // Redirección infalible a la API oficial de WhatsApp
-                    window.location.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
+                    alert("¡Pedido registrado con éxito! Serás redirigido a WhatsApp.");
+                    
+                    // SOLUCIÓN WHATSAPP INFALIBLE: Usar enlace oculto
+                    const link = document.createElement('a');
+                    link.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    setTimeout(() => { cerrarCheckout(); window.location.reload(); }, 1500);
                 } else {
                     alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
-                    cerrarCheckout(); 
-                    window.location.reload(); 
+                    cerrarCheckout(); window.location.reload(); 
                 }
 
             } catch (error) {
