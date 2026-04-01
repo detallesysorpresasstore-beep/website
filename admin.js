@@ -49,7 +49,7 @@ const modalPago = document.getElementById('modal-pago');
 const btnNuevoPago = document.getElementById('btn-nuevo-pago');
 const btnGuardarPago = document.getElementById('btn-guardar-pago');
 
-// Promociones y sus Filtros en Cascada
+// Promociones y Filtros en Cascada
 const modalPromocion = document.getElementById('modal-promocion');
 const btnNuevaPromocion = document.getElementById('btn-nueva-promocion');
 const btnGuardarPromocion = document.getElementById('btn-guardar-promocion');
@@ -168,7 +168,6 @@ function configurarEventos() {
         btnNuevaPromocion.addEventListener('click', () => {
             document.getElementById('form-promocion').reset();
             document.getElementById('promo-id').value = '';
-            // Resetear selects en cascada
             if(promoOfertaCategoria) promoOfertaCategoria.value = '';
             actualizarSubcategoriasPromo('');
             filtrarProductosPromo();
@@ -180,7 +179,6 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-promo').addEventListener('click', () => modalPromocion.classList.add('hidden'));
     if (btnGuardarPromocion) btnGuardarPromocion.addEventListener('click', guardarPromocion);
 
-    // NUEVO: Listeners para Filtros en Cascada de Promociones
     if(promoOfertaCategoria) {
         promoOfertaCategoria.addEventListener('change', (e) => {
             actualizarSubcategoriasPromo(e.target.value);
@@ -314,10 +312,9 @@ function actualizarSelectsPromocionesIniciales() {
         categoriasGlobales.forEach(c => promoOfertaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
     }
 
-    filtrarProductosPromo(); // Llena inicialmente con todos los productos
+    filtrarProductosPromo(); 
 }
 
-// Filtro Cascada 1: Categoría -> Subcategoría
 function actualizarSubcategoriasPromo(catName) {
     if(!promoOfertaSubcategoria) return;
     promoOfertaSubcategoria.innerHTML = '<option value="">Todas las subcategorías</option>';
@@ -341,7 +338,6 @@ function actualizarSubcategoriasPromo(catName) {
     }
 }
 
-// Filtro Cascada 2: Categoría+Subcategoría -> Productos
 function filtrarProductosPromo() {
     if(!promoOfertaProducto) return;
     const cat = promoOfertaCategoria ? promoOfertaCategoria.value : '';
@@ -427,7 +423,6 @@ window.prepararEdicionPromo = (id) => {
     document.getElementById('promo-condicion-cantidad').value = p.cantidadCondicion || 1;
     document.getElementById('promo-oferta-descuento').value = p.porcentajeDescuento || 30;
 
-    // Magia para reconstruir los filtros en cascada según el producto guardado
     const prod = productosGlobales.find(x => x.id === p.productoOfertaId);
     if(prod) {
         if(promoOfertaCategoria) promoOfertaCategoria.value = prod.categoria || '';
@@ -448,7 +443,7 @@ window.eliminarPromo = async (id) => {
 };
 
 // ==========================================
-// MÓDULOS ANTERIORES: CATEGORÍAS, PRODUCTOS, CLIENTES Y PEDIDOS
+// MÓDULOS ANTERIORES: CATEGORÍAS, PRODUCTOS Y CLIENTES
 // ==========================================
 
 async function cargarCategorias() {
@@ -635,6 +630,10 @@ function exportarClientesExcel() {
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
 
+// ==========================================
+// MÓDULO: PEDIDOS (EL SÚPER MODAL)
+// ==========================================
+
 async function cargarPedidos() {
     try { const querySnapshot = await getDocs(ordersCollection); pedidosGlobales = []; querySnapshot.forEach((docSnap) => { const pedido = docSnap.data(); pedido.id = docSnap.id; pedidosGlobales.push(pedido); }); aplicarFiltrosPedidos(); } catch (error) { console.error(error); }
 }
@@ -652,12 +651,82 @@ function dibujarTablaPedidos(arreglo) {
     arreglo.forEach((pedido) => {
         let colorEstado = 'bg-gray-100 text-gray-600';
         if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700'; if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700'; if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700'; if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700'; if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
-        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : pedido.total.toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}', '${pedido.estado}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
+        
+        // ACTUALIZADO: Solo pasamos el ID porque el modal ahora busca el resto
+        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
     });
 }
 
-window.abrirModalPedido = (id, estadoActual) => { document.getElementById('ped-id').value = id; document.getElementById('ped-estado').value = estadoActual; modalPedido.classList.remove('hidden'); };
+// ACTUALIZACIÓN: LÓGICA DEL SÚPER MODAL
+window.abrirModalPedido = (id) => { 
+    const pedido = pedidosGlobales.find(p => p.id === id);
+    if(!pedido) return;
+
+    document.getElementById('ped-id').value = id; 
+    document.getElementById('ped-id-display').textContent = `#${id.slice(-6).toUpperCase()}`;
+    document.getElementById('ped-estado').value = pedido.estado; 
+    
+    // Llenar Cliente
+    document.getElementById('ped-cliente-nombre').textContent = pedido.clienteNombre || 'Sin nombre';
+    document.getElementById('ped-cliente-email').textContent = pedido.clienteEmail || 'Sin email';
+    document.getElementById('ped-cliente-direccion').textContent = pedido.direccion || 'Sin dirección';
+
+    // Llenar Pago
+    document.getElementById('ped-pago-metodo').textContent = pedido.metodoPago || 'No especificado';
+    document.getElementById('ped-pago-referencia').textContent = pedido.referencia || 'N/A';
+
+    const btnComprobante = document.getElementById('ped-btn-comprobante');
+    const txtNoComprobante = document.getElementById('ped-no-comprobante');
+
+    if (pedido.comprobanteUrl && pedido.comprobanteUrl.startsWith('http')) {
+        btnComprobante.href = pedido.comprobanteUrl;
+        btnComprobante.classList.remove('hidden');
+        txtNoComprobante.classList.add('hidden');
+    } else {
+        btnComprobante.classList.add('hidden');
+        btnComprobante.href = '#';
+        txtNoComprobante.classList.remove('hidden');
+    }
+
+    // Llenar Lista de Productos
+    const listaProd = document.getElementById('ped-productos-lista');
+    listaProd.innerHTML = '';
+    if (pedido.productos && pedido.productos.length > 0) {
+        pedido.productos.forEach(prod => {
+            const img = prod.imagen || 'https://via.placeholder.com/50';
+            listaProd.innerHTML += `
+                <li class="flex items-center gap-3 bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
+                    <img src="${img}" class="w-12 h-12 rounded object-cover border border-gray-200">
+                    <div class="flex-1">
+                        <p class="text-sm font-bold text-gray-800 line-clamp-1">${prod.nombre}</p>
+                        <p class="text-xs text-gray-500">${prod.cantidad} und(s) x $${prod.precio.toFixed(2)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold text-brand-pink">$${(prod.cantidad * prod.precio).toFixed(2)}</p>
+                    </div>
+                </li>
+            `;
+        });
+    } else {
+        listaProd.innerHTML = '<li class="text-sm text-gray-500 italic text-center py-4">No hay productos guardados en esta orden.</li>';
+    }
+
+    // Llenar Totales (Maneja versiones antiguas y nuevas de la BD)
+    const totalDolares = pedido.totalUSD || pedido.total || 0;
+    document.getElementById('ped-total-usd').textContent = `$${totalDolares.toFixed(2)}`;
+    
+    let textoSecundario = '';
+    if (pedido.monedaSecundaria === 'VES' || (!pedido.monedaSecundaria && pedido.totalVES)) {
+        textoSecundario = `Bs. ${(pedido.totalSecundario || pedido.totalVES || 0).toFixed(2)}`;
+    } else if (pedido.monedaSecundaria === 'COP') {
+        textoSecundario = `$ ${(pedido.totalSecundario || 0).toFixed(2)} COP`;
+    }
+    document.getElementById('ped-total-secundario').textContent = textoSecundario;
+
+    modalPedido.classList.remove('hidden'); 
+};
+
 async function actualizarEstadoPedido() {
-    const id = document.getElementById('ped-id').value; const nuevoEstado = document.getElementById('ped-estado').value; btnGuardarPedido.disabled = true; btnGuardarPedido.innerText = "Actualizando...";
-    try { await updateDoc(doc(db, "orders", id), { estado: nuevoEstado }); modalPedido.classList.add('hidden'); cargarPedidos(); } catch (error) { alert("Error al actualizar."); } finally { btnGuardarPedido.disabled = false; btnGuardarPedido.innerText = "Actualizar Estado"; }
+    const id = document.getElementById('ped-id').value; const nuevoEstado = document.getElementById('ped-estado').value; btnGuardarPedido.disabled = true; btnGuardarPedido.innerText = "Guardando...";
+    try { await updateDoc(doc(db, "orders", id), { estado: nuevoEstado }); modalPedido.classList.add('hidden'); cargarPedidos(); } catch (error) { alert("Error al actualizar."); } finally { btnGuardarPedido.disabled = false; btnGuardarPedido.innerHTML = `<i class="ph-bold ph-floppy-disk"></i> Guardar Cambios`; }
 }
