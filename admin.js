@@ -3,7 +3,7 @@
  */
 
 import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 
@@ -715,6 +715,47 @@ window.abrirModalPedido = (id) => {
 };
 
 async function actualizarEstadoPedido() {
-    const id = document.getElementById('ped-id').value; const nuevoEstado = document.getElementById('ped-estado').value; btnGuardarPedido.disabled = true; btnGuardarPedido.innerText = "Guardando...";
-    try { await updateDoc(doc(db, "orders", id), { estado: nuevoEstado }); modalPedido.classList.add('hidden'); cargarPedidos(); } catch (error) { alert("Error al actualizar."); } finally { btnGuardarPedido.disabled = false; btnGuardarPedido.innerHTML = `<i class="ph-bold ph-floppy-disk"></i> Guardar Cambios`; }
+    const id = document.getElementById('ped-id').value; 
+    const nuevoEstado = document.getElementById('ped-estado').value; 
+    btnGuardarPedido.disabled = true; 
+    btnGuardarPedido.innerText = "Guardando...";
+
+    try { 
+        // 1. Buscamos el pedido en la base de datos para saber qué productos tiene
+        const orderRef = doc(db, "orders", id);
+        const orderSnap = await getDoc(orderRef);
+        
+        if (orderSnap.exists()) {
+            const orderData = orderSnap.data();
+            
+            // LÓGICA DE STOCK: Si cancelamos el pedido (y no estaba cancelado antes) -> Devolvemos el stock
+            if (nuevoEstado === 'Cancelado' && orderData.estado !== 'Cancelado') {
+                for (const item of orderData.productos) {
+                    const idReal = item.productoOriginalId || item.id;
+                    await updateDoc(doc(db, "products", idReal), { stock: increment(item.cantidad) });
+                }
+            } 
+            // LÓGICA DE STOCK: Si lo habíamos cancelado por error y lo RESTAURAMOS -> Volvemos a descontarlo
+            else if (orderData.estado === 'Cancelado' && nuevoEstado !== 'Cancelado') {
+                for (const item of orderData.productos) {
+                    const idReal = item.productoOriginalId || item.id;
+                    await updateDoc(doc(db, "products", idReal), { stock: increment(-item.cantidad) });
+                }
+            }
+        }
+
+        // 2. Actualizamos el estado de la orden
+        await updateDoc(orderRef, { estado: nuevoEstado }); 
+        
+        modalPedido.classList.add('hidden'); 
+        cargarPedidos(); 
+        cargarProductos(); // Refrescamos la tabla de productos por si el stock cambió
+        
+    } catch (error) { 
+        alert("Error al actualizar el estado del pedido."); 
+        console.error(error); 
+    } finally { 
+        btnGuardarPedido.disabled = false; 
+        btnGuardarPedido.innerHTML = `<i class="ph-bold ph-floppy-disk"></i> Guardar Cambios`; 
+    }
 }
