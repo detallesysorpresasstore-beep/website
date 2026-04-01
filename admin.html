@@ -263,7 +263,6 @@
                             <i class="ph ph-floppy-disk"></i> Guardar Todo
                         </button>
                     </div>
-                    
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tasa BCV (1 USD en Bs) *</label>
@@ -383,9 +382,15 @@
                             <p class="text-sm text-gray-600 mb-1"><span class="font-medium">Método:</span> <span id="ped-pago-metodo" class="bg-gray-100 px-2 py-0.5 rounded text-xs font-bold text-gray-700"></span></p>
                             <p class="text-sm text-gray-600 mb-3"><span class="font-medium">Referencia:</span> <span id="ped-pago-referencia" class="font-mono"></span></p>
                             
-                            <a id="ped-btn-comprobante" href="#" target="_blank" class="hidden w-full bg-brand-orange text-white font-bold text-sm py-2 rounded-lg hover:bg-orange-500 transition-colors shadow-sm flex justify-center items-center gap-2">
-                                <i class="ph-bold ph-image"></i> Ver Comprobante
-                            </a>
+                            <div id="ped-contenedor-comprobante" class="hidden mt-3">
+                                <p class="text-xs font-bold text-gray-500 uppercase mb-1">Comprobante Adjunto:</p>
+                                <a id="ped-enlace-comprobante" href="#" target="_blank" class="block w-full rounded-lg overflow-hidden border border-gray-200 hover:border-brand-blue transition-colors relative group bg-gray-50">
+                                    <img id="ped-img-comprobante" src="" class="w-full h-32 object-contain p-1">
+                                    <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <span class="text-white font-bold flex items-center gap-1"><i class="ph-bold ph-arrows-out"></i> Ver Completo</span>
+                                    </div>
+                                </a>
+                            </div>
                             <p id="ped-no-comprobante" class="hidden text-xs text-gray-400 italic text-center mt-2">Sin comprobante adjunto</p>
                         </div>
                     </div>
