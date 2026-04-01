@@ -1,6 +1,4 @@
 /**
- * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública, Auth, Carrito y Checkout)
- *//**
  * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública, Auth, Carrito, Checkout y Promociones)
  */
 
@@ -299,8 +297,10 @@ function setupModalDetalle() {
         document.getElementById('detalle-categoria').textContent = prod.categoria;
         document.getElementById('detalle-subcategoria').textContent = prod.subcategoria || '';
         document.getElementById('detalle-nombre').textContent = prod.nombre;
+        
         document.getElementById('detalle-precio').textContent = `$${prod.precio.toFixed(2)}`;
         document.getElementById('detalle-precio-bs').textContent = formatearMoneda(prod.precio, 'VES');
+        
         document.getElementById('detalle-descripcion').textContent = prod.descripcion || 'Este producto no tiene una descripción detallada.';
         
         const badge = document.getElementById('detalle-stock-badge');
@@ -331,7 +331,7 @@ function setupModalDetalle() {
 }
 
 // ==========================================
-// MÓDULO: CARRITO Y PROMOCIONES (UPSELL)
+// MÓDULO: CARRITO DE COMPRAS Y PROMOCIONES
 // ==========================================
 
 function cargarCarritoLocal() {
@@ -345,93 +345,28 @@ function guardarCarritoLocal() {
     renderizarCarrito();
 }
 
-// LÓGICA DE PROMOS
-function verificarMotorDePromociones() {
-    promocionesPublicas.forEach(promo => {
-        // No mostrar si ya se le ofreció en esta sesión
-        if(sessionStorage.getItem('promo_vista_' + promo.id)) return;
-
-        // Verificar si el carrito cumple la condición
-        let itemsQueCumplen = 0;
-        carritoCompras.forEach(item => {
-            const prodBase = window.productosPublicos.find(p => p.id === (item.productoOriginalId || item.id));
-            if (prodBase) {
-                if (promo.categoriaCondicion === '' || prodBase.categoria === promo.categoriaCondicion) {
-                    itemsQueCumplen += item.cantidad;
-                }
-            }
-        });
-
-        if (itemsQueCumplen >= promo.cantidadCondicion) {
-            dispararPopupUpsell(promo);
-        }
-    });
-}
-
-function dispararPopupUpsell(promo) {
-    sessionStorage.setItem('promo_vista_' + promo.id, 'true'); // Marcar como vista
-    
-    const prodOferta = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
-    if(!prodOferta) return;
-
-    const precioConDescuento = prodOferta.precio * (1 - (promo.porcentajeDescuento / 100));
-
-    // Crear la ventana flotante en HTML puro
-    const modalHtml = `
-    <div id="modal-promo-dinamico" class="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden text-center relative border-4 border-brand-pink transform transition-transform scale-100 animate-bounce-short">
-            <button onclick="document.getElementById('modal-promo-dinamico').remove()" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 bg-white rounded-full p-1"><i class="ph ph-x text-2xl"></i></button>
-            <div class="bg-brand-pink text-white py-4 px-6"><h3 class="text-xl font-bold leading-tight flex items-center justify-center gap-2"><i class="ph-fill ph-gift text-2xl"></i> ${promo.nombre}</h3></div>
-            <div class="p-6">
-                <div class="relative w-32 h-32 mx-auto mb-4">
-                    <img src="${prodOferta.imagenes[0]}" class="w-full h-full object-cover rounded-xl border border-gray-100 shadow-sm">
-                    <span class="absolute -top-3 -right-3 bg-brand-yellow text-brand-orange font-black text-sm px-2 py-1 rounded-full border-2 border-white transform rotate-12">-${promo.porcentajeDescuento}%</span>
-                </div>
-                <h4 class="text-lg font-bold text-gray-800 mb-1 line-clamp-2">${prodOferta.nombre}</h4>
-                <p class="text-gray-500 text-sm mb-4">Solo por tu compra actual te damos este beneficio especial.</p>
-                <div class="flex justify-center items-center gap-4 mb-6">
-                    <span class="text-gray-400 line-through text-xl">$${prodOferta.precio.toFixed(2)}</span>
-                    <span class="text-4xl font-black text-brand-orange">$${precioConDescuento.toFixed(2)}</span>
-                </div>
-                <button onclick="agregarPromoAlCarrito('${prodOferta.id}', ${precioConDescuento}); document.getElementById('modal-promo-dinamico').remove();" class="w-full bg-brand-pink text-white font-bold text-lg py-3 rounded-xl shadow-lg hover:bg-pink-600 transition-all transform hover:-translate-y-1">
-                    ¡Lo quiero! Agregar Oferta
-                </button>
-                <button onclick="document.getElementById('modal-promo-dinamico').remove()" class="mt-3 text-sm text-gray-400 hover:text-gray-600 hover:underline">No gracias, seguir con mi carrito</button>
-            </div>
-        </div>
-    </div>`;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-// Función exclusiva para agregar la promoción al carrito sin mezclarla con el producto a precio normal
 window.agregarPromoAlCarrito = (idProductoOriginal, precioPromo) => {
     const productoBase = window.productosPublicos.find(p => p.id === idProductoOriginal);
     if(!productoBase) return;
 
-    // Verificar si ya tiene esta promo en el carrito
     const idPromoUnico = productoBase.id + '_promo';
     const itemExistente = carritoCompras.find(item => item.id === idPromoUnico);
     
     if (itemExistente) {
-        alert("Ya agregaste esta oferta especial a tu carrito.");
-        return;
+        alert("Ya agregaste esta oferta a tu carrito."); return;
     }
     
     carritoCompras.push({
         id: idPromoUnico, 
-        productoOriginalId: productoBase.id, // VITAL: Para descontar el stock correcto
+        productoOriginalId: productoBase.id, 
         nombre: `🌟 OFERTA: ${productoBase.nombre}`,
         precio: precioPromo,
         imagen: productoBase.imagenes.length > 0 ? productoBase.imagenes[0] : 'https://via.placeholder.com/150',
         stockMaximo: productoBase.stock, 
-        cantidad: 1 // Solo permitimos 1 promoción por oferta
+        cantidad: 1 
     });
 
     guardarCarritoLocal();
-    const sidebarCart = document.getElementById('cart-sidebar');
-    const overlayCart = document.getElementById('cart-overlay');
-    if(sidebarCart) { sidebarCart.classList.remove('translate-x-full'); overlayCart.classList.remove('hidden'); }
 };
 
 window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
@@ -446,7 +381,7 @@ window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
         if(cantidadAgregada > productoBase.stock) { alert(`Stock insuficiente. Solo quedan ${productoBase.stock} unidades.`); return; }
         carritoCompras.push({
             id: productoBase.id, 
-            productoOriginalId: productoBase.id, // Agregado por seguridad
+            productoOriginalId: productoBase.id,
             nombre: productoBase.nombre, precio: productoBase.precio,
             imagen: productoBase.imagenes.length > 0 ? productoBase.imagenes[0] : 'https://via.placeholder.com/150',
             stockMaximo: productoBase.stock, cantidad: cantidadAgregada
@@ -454,9 +389,6 @@ window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
     }
     guardarCarritoLocal();
     
-    // Verificar si se activó alguna promoción
-    verificarMotorDePromociones();
-
     const sidebarCart = document.getElementById('cart-sidebar');
     const overlayCart = document.getElementById('cart-overlay');
     if(sidebarCart.classList.contains('translate-x-full')) {
@@ -469,18 +401,14 @@ window.modificarCantidadCarrito = (idProducto, delta) => {
     const item = carritoCompras.find(i => i.id === idProducto);
     if(!item) return;
 
-    // Si es una promoción, no dejamos aumentar la cantidad (solo restar/eliminar)
     if(idProducto.includes('_promo') && delta > 0) {
-        alert("Las ofertas especiales están limitadas a 1 unidad por compra.");
-        return;
+        alert("Las ofertas especiales están limitadas a 1 unidad."); return;
     }
 
     const nuevaCantidad = item.cantidad + delta;
     if(nuevaCantidad <= 0) { eliminarDelCarrito(idProducto); return; }
     if(nuevaCantidad > item.stockMaximo) { alert("Haz alcanzado el límite de stock para este producto."); return; }
     item.cantidad = nuevaCantidad; guardarCarritoLocal();
-    
-    verificarMotorDePromociones();
 };
 
 window.eliminarDelCarrito = (idProducto) => {
@@ -488,6 +416,7 @@ window.eliminarDelCarrito = (idProducto) => {
     guardarCarritoLocal();
 };
 
+// DIBUJA EL CARRITO Y EVALÚA LAS PROMOS DINÁMICAS (UPSELL IN-CART)
 function renderizarCarrito() {
     const contenedor = document.getElementById('cart-items-container');
     const badge = document.getElementById('cart-count');
@@ -509,11 +438,61 @@ function renderizarCarrito() {
     }
 
     contenedor.innerHTML = '';
+    
+    // 1. Dibujar los productos comprados
     carritoCompras.forEach(item => {
         totalItems += item.cantidad; subtotalGlobal += (item.precio * item.cantidad);
-        const estiloOferta = item.id.includes('_promo') ? 'border-brand-pink bg-pink-50' : 'border-gray-100 bg-white';
+        const estiloOferta = item.id.includes('_promo') ? 'border-brand-pink bg-pink-50 border-2' : 'border-gray-100 bg-white border';
         
-        contenedor.innerHTML += `<div class="flex items-center gap-4 ${estiloOferta} border p-3 rounded-xl shadow-sm relative"><img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50"><div class="flex-1"><h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1">${item.nombre}</h4><p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p><div class="flex items-center gap-3 mt-2"><div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50"><button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button><span class="px-2 text-sm font-bold text-gray-800">${item.cantidad}</span><button onclick="modificarCantidadCarrito('${item.id}', 1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-plus"></i></button></div></div></div><button onclick="eliminarDelCarrito('${item.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded-full"><i class="ph-fill ph-trash text-lg"></i></button></div>`;
+        contenedor.innerHTML += `<div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative"><img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50"><div class="flex-1"><h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1">${item.nombre}</h4><p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p><div class="flex items-center gap-3 mt-2"><div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white"><button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button><span class="px-2 text-sm font-bold text-gray-800">${item.cantidad}</span><button onclick="modificarCantidadCarrito('${item.id}', 1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-plus"></i></button></div></div></div><button onclick="eliminarDelCarrito('${item.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded-full"><i class="ph-fill ph-trash text-lg"></i></button></div>`;
+    });
+
+    // 2. Evaluar y mostrar Banner Promocional
+    let promoMostrada = false;
+    promocionesPublicas.forEach(promo => {
+        if (promoMostrada) return; // Solo mostramos 1 banner a la vez
+
+        const prodOferta = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
+        if (!prodOferta) return;
+
+        const idPromoUnico = prodOferta.id + '_promo';
+        const yaEnCarrito = carritoCompras.find(item => item.id === idPromoUnico);
+
+        if (!yaEnCarrito) {
+            let itemsQueCumplen = 0;
+            carritoCompras.forEach(item => {
+                const prodBase = window.productosPublicos.find(p => p.id === (item.productoOriginalId || item.id));
+                if (prodBase && (promo.categoriaCondicion === '' || prodBase.categoria === promo.categoriaCondicion)) {
+                    itemsQueCumplen += item.cantidad;
+                }
+            });
+
+            if (itemsQueCumplen >= promo.cantidadCondicion) {
+                promoMostrada = true;
+                const precioConDescuento = prodOferta.precio * (1 - (promo.porcentajeDescuento / 100));
+
+                contenedor.innerHTML += `
+                    <div class="mt-6 bg-pink-50 border-2 border-brand-pink border-dashed rounded-xl p-4 relative mb-2">
+                        <span class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-brand-pink text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm whitespace-nowrap">
+                            🎁 ${promo.nombre}
+                        </span>
+                        <div class="flex items-center gap-3 mt-2">
+                            <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-lg border border-pink-200">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2">${prodOferta.nombre}</h4>
+                                <div class="flex items-baseline gap-2 mt-1">
+                                    <span class="text-xs text-gray-400 line-through">$${prodOferta.precio.toFixed(2)}</span>
+                                    <span class="text-lg font-black text-brand-orange">$${precioConDescuento.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="agregarPromoAlCarrito('${prodOferta.id}', ${precioConDescuento})" class="w-full mt-3 bg-brand-pink text-white font-bold text-sm py-2 rounded-lg hover:bg-pink-600 transition-colors shadow-sm flex justify-center items-center gap-2">
+                            <i class="ph-bold ph-plus"></i> Añadir Oferta Especial
+                        </button>
+                    </div>
+                `;
+            }
+        }
     });
 
     badge.textContent = totalItems; badge.classList.remove('hidden');
@@ -543,7 +522,6 @@ function setupCheckout() {
     const btnConfirmar = document.getElementById('btn-confirmar-pedido');
     const formCheckout = document.getElementById('form-checkout');
 
-    // 1. Proceder al Pago (Carga de métodos dinámicos)
     if(btnProcesar) {
         btnProcesar.addEventListener('click', () => {
             if(!currentUser) {
@@ -554,12 +532,9 @@ function setupCheckout() {
             }
             if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
             
-            // Llenar select de métodos dinámicamente desde Firebase
             selectMetodo.innerHTML = '<option value="">Selecciona cómo vas a pagar...</option>';
-            metodosPagoPublicos.forEach(m => {
-                selectMetodo.innerHTML += `<option value="${m.id}">${m.nombre}</option>`;
-            });
-            // Ocultar campos de instrucciones si había algo
+            metodosPagoPublicos.forEach(m => { selectMetodo.innerHTML += `<option value="${m.id}">${m.nombre}</option>`; });
+            
             divInstrucciones.classList.add('hidden'); divReferencia.classList.add('hidden'); divComprobante.classList.add('hidden');
             
             document.getElementById('checkout-total').textContent = `$${subtotalGlobal.toFixed(2)}`;
@@ -569,7 +544,6 @@ function setupCheckout() {
         });
     }
 
-    // 2. Dinamismo del Método de Pago (Cálculo de Monedas y Descuentos)
     if(selectMetodo) {
         selectMetodo.addEventListener('change', (e) => {
             const metodoId = e.target.value;
@@ -584,7 +558,6 @@ function setupCheckout() {
                 return;
             }
 
-            // Aplicar descuento si el método lo tiene
             let totalCalculado = subtotalGlobal;
             let badgeDescuento = '';
             if (metodo.descuento > 0) {
@@ -594,41 +567,32 @@ function setupCheckout() {
 
             document.getElementById('checkout-total').innerHTML = `$${totalCalculado.toFixed(2)} ${badgeDescuento}`;
             
-            // Mostrar equivalencia según moneda elegida en el panel
             if (metodo.moneda === 'VES') document.getElementById('checkout-total-bs').textContent = formatearMoneda(totalCalculado, 'VES');
             else if (metodo.moneda === 'COP') document.getElementById('checkout-total-bs').textContent = formatearMoneda(totalCalculado, 'COP');
             else document.getElementById('checkout-total-bs').textContent = 'Pago en USD.';
 
-            // Mostrar instrucciones y requerimientos
             divInstrucciones.classList.remove('hidden');
             divInstrucciones.innerHTML = `<strong>Paso 1: Realiza el pago a estos datos:</strong><br>${metodo.instrucciones}`;
 
-            if (metodo.requisitos === 'ambos') {
-                divReferencia.classList.remove('hidden'); divComprobante.classList.remove('hidden'); inputReferencia.required = true;
-            } else if (metodo.requisitos === 'referencia') {
-                divReferencia.classList.remove('hidden'); inputReferencia.required = true;
-            }
+            if (metodo.requisitos === 'ambos') { divReferencia.classList.remove('hidden'); divComprobante.classList.remove('hidden'); inputReferencia.required = true; } 
+            else if (metodo.requisitos === 'referencia') { divReferencia.classList.remove('hidden'); inputReferencia.required = true; }
         });
     }
 
-    // 3. Subir el Comprobante (Capture) con ImgBB
     if (inputComprobante) {
         inputComprobante.addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
+            const file = event.target.files[0]; if (!file) return;
             textoComprobante.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Subiendo...'; btnConfirmar.disabled = true; 
             try {
                 const formData = new FormData(); formData.append('image', file);
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) { urlComprobantePago = data.data.url; textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Comprobante Cargado'; }
-            } catch (error) {
-                console.error("Error al subir:", error); textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error. Intenta de nuevo'; inputComprobante.value = '';
-            } finally { btnConfirmar.disabled = false; }
+                if (data.success) { urlComprobantePago = data.data.url; textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; }
+            } catch (error) { textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error. Intenta de nuevo'; inputComprobante.value = ''; } 
+            finally { btnConfirmar.disabled = false; }
         });
     }
 
-    // Cerrar Checkout
     const cerrarCheckout = () => {
         modalCheckout.classList.add('hidden'); formCheckout.reset(); divInstrucciones.classList.add('hidden'); divReferencia.classList.add('hidden'); divComprobante.classList.add('hidden');
         inputReferencia.required = false; urlComprobantePago = ''; textoComprobante.innerHTML = 'Subir Capture';
@@ -636,7 +600,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // 4. CONFIRMAR PEDIDO (CON ESCUDO DE INVENTARIO Y DESCUENTOS DE MÉTODOS)
+    // CONFIRMAR PEDIDO (ESCUDO DE INVENTARIO ACTIVADO)
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -646,16 +610,14 @@ function setupCheckout() {
             const referencia = inputReferencia.value.trim();
             const metodoConfig = metodosPagoPublicos.find(m => m.id === metodoId);
 
-            // Validaciones del método de pago
             if (!metodoConfig) return alert("Selecciona un método de pago válido.");
             if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return alert("Debes subir la foto (capture) del pago.");
 
             const originalText = btnConfirmar.innerHTML;
-            btnConfirmar.disabled = true;
-            btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
+            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
 
             try {
-                // ================= ESCUDO DE INVENTARIO =================
+                // ESCUDO DE INVENTARIO
                 let problemasStock = [];
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
@@ -669,42 +631,38 @@ function setupCheckout() {
                     alert("¡Lo sentimos! El stock cambió y algunos productos ya no están disponibles:\n\n" + problemasStock.join("\n"));
                     btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText; return; 
                 }
-                // ========================================================
 
                 btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando Compra...';
 
-                // Cálculo Final del Total según el descuento del método de pago
                 let totalFinalUSD = subtotalGlobal;
-                if(metodoConfig.descuento > 0) {
-                    totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
-                }
+                if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
 
                 const orderData = {
                     clienteId: currentUser.uid,
                     clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
                     clienteEmail: currentUser.email,
                     direccion: direccion,
-                    metodoPago: metodoConfig.nombre, // Guardamos el nombre "Binance", "Zelle", etc.
+                    metodoPago: metodoConfig.nombre, 
                     referencia: referencia || 'N/A',
                     comprobanteUrl: urlComprobantePago, 
                     productos: carritoCompras, 
                     totalUSD: totalFinalUSD,
                     monedaSecundaria: metodoConfig.moneda,
-                    totalSecundario: metodoConfig.moneda === 'VES' ? (totalFinalUSD * configuracionTienda.tasaBcv) : (metodoConfig.moneda === 'COP' ? (totalFinalUSD * configuracionTienda.tasaCop) : 0),
+                    totalSecundario: metodoConfig.moneda === 'VES' ? parseFloat((totalFinalUSD * configuracionTienda.tasaBcv).toFixed(2)) : (metodoConfig.moneda === 'COP' ? parseFloat((totalFinalUSD * configuracionTienda.tasaCop).toFixed(2)) : 0),
                     estado: 'Pendiente',
                     fecha: new Date().toISOString()
                 };
 
                 await addDoc(collection(db, "orders"), orderData);
 
-                // Descontar Stock de los productos (usamos ID original en caso de ser Promo)
+                // Descontar Stock
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
                 }
 
                 carritoCompras = []; guardarCarritoLocal(); urlComprobantePago = '';
-                alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito. Te contactaremos pronto para el envío.");
+                alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
                 cerrarCheckout(); window.location.reload(); 
 
             } catch (error) {
