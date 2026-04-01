@@ -43,24 +43,27 @@ const buscadorClientes = document.getElementById('buscador-clientes');
 const filtroRolClientes = document.getElementById('filtro-rol-clientes'); 
 const filtroFechaClientes = document.getElementById('filtro-fecha-clientes'); 
 
-// NUEVO: Tasas y Métodos de Pago
+// Tasas y Métodos de Pago
 const btnGuardarTasas = document.getElementById('btn-guardar-tasas');
 const modalPago = document.getElementById('modal-pago');
 const btnNuevoPago = document.getElementById('btn-nuevo-pago');
 const btnGuardarPago = document.getElementById('btn-guardar-pago');
 
-// NUEVO: Promociones
+// Promociones y sus Filtros en Cascada
 const modalPromocion = document.getElementById('modal-promocion');
 const btnNuevaPromocion = document.getElementById('btn-nueva-promocion');
 const btnGuardarPromocion = document.getElementById('btn-guardar-promocion');
+const promoOfertaCategoria = document.getElementById('promo-oferta-categoria');
+const promoOfertaSubcategoria = document.getElementById('promo-oferta-subcategoria');
+const promoOfertaProducto = document.getElementById('promo-oferta-producto');
 
 // Colecciones en Firestore
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
 const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users");
-const paymentsCollection = collection(db, "payment_methods"); // NUEVA COLECCIÓN
-const promosCollection = collection(db, "promotions"); // NUEVA COLECCIÓN
+const paymentsCollection = collection(db, "payment_methods"); 
+const promosCollection = collection(db, "promotions"); 
 const configDocRef = doc(db, "config", "store_settings");
 
 // Variables Globales
@@ -70,8 +73,8 @@ let categoriasGlobales = [];
 let pedidosGlobales = []; 
 let clientesGlobales = []; 
 let clientesFiltrados = []; 
-let pagosGlobales = []; // NUEVO
-let promosGlobales = []; // NUEVO
+let pagosGlobales = []; 
+let promosGlobales = []; 
 let arrayImagenesUrls = [];
 
 // ==========================================
@@ -85,10 +88,9 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarTasas(); 
     cargarPagos();
     
-    // Cargar dependencias en orden
     cargarCategorias().then(() => {
         cargarProductos().then(() => {
-            cargarPromociones(); // Las promos necesitan que productos y categorías ya estén cargados
+            cargarPromociones(); 
         });
     });
     
@@ -106,8 +108,7 @@ function configurarEventos() {
     if (btnLogout) {
         btnLogout.addEventListener('click', async () => {
             if (confirm("¿Seguro que deseas cerrar sesión?")) {
-                await signOut(auth);
-                window.location.href = 'index.html';
+                await signOut(auth); window.location.href = 'index.html';
             }
         });
     }
@@ -148,7 +149,7 @@ function configurarEventos() {
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
     if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
 
-    // ---- EVENTOS TASAS Y PAGOS ----
+    // Eventos Tasas y Pagos
     if (btnGuardarTasas) btnGuardarTasas.addEventListener('click', guardarTasas);
     if (btnNuevoPago) {
         btnNuevoPago.addEventListener('click', () => {
@@ -162,11 +163,15 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-pago').addEventListener('click', () => modalPago.classList.add('hidden'));
     if (btnGuardarPago) btnGuardarPago.addEventListener('click', guardarPago);
 
-    // ---- EVENTOS PROMOCIONES ----
+    // Eventos Promociones
     if (btnNuevaPromocion) {
         btnNuevaPromocion.addEventListener('click', () => {
             document.getElementById('form-promocion').reset();
             document.getElementById('promo-id').value = '';
+            // Resetear selects en cascada
+            if(promoOfertaCategoria) promoOfertaCategoria.value = '';
+            actualizarSubcategoriasPromo('');
+            filtrarProductosPromo();
             document.getElementById('modal-titulo-promo').innerText = "Nueva Promoción";
             modalPromocion.classList.remove('hidden');
         });
@@ -174,10 +179,23 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-promo').addEventListener('click', () => modalPromocion.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-promo').addEventListener('click', () => modalPromocion.classList.add('hidden'));
     if (btnGuardarPromocion) btnGuardarPromocion.addEventListener('click', guardarPromocion);
+
+    // NUEVO: Listeners para Filtros en Cascada de Promociones
+    if(promoOfertaCategoria) {
+        promoOfertaCategoria.addEventListener('change', (e) => {
+            actualizarSubcategoriasPromo(e.target.value);
+            filtrarProductosPromo();
+        });
+    }
+    if(promoOfertaSubcategoria) {
+        promoOfertaSubcategoria.addEventListener('change', () => {
+            filtrarProductosPromo();
+        });
+    }
 }
 
 // ==========================================
-// MÓDULO: TASAS Y MÉTODOS DE PAGO (NUEVO)
+// MÓDULO: TASAS Y MÉTODOS DE PAGO
 // ==========================================
 
 async function cargarTasas() {
@@ -280,27 +298,71 @@ window.eliminarPago = async (id) => {
 };
 
 // ==========================================
-// MÓDULO: PROMOCIONES (NUEVO)
+// MÓDULO: PROMOCIONES (CON FILTROS EN CASCADA)
 // ==========================================
 
-function actualizarSelectsPromociones() {
-    const selectCat = document.getElementById('promo-condicion-categoria');
-    const selectProd = document.getElementById('promo-oferta-producto');
+function actualizarSelectsPromocionesIniciales() {
+    const selectCatCondicion = document.getElementById('promo-condicion-categoria');
     
-    if(selectCat) {
-        selectCat.innerHTML = '<option value="">Cualquier Categoría</option>';
-        categoriasGlobales.forEach(c => selectCat.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
+    if(selectCatCondicion) {
+        selectCatCondicion.innerHTML = '<option value="">Cualquier Categoría</option>';
+        categoriasGlobales.forEach(c => selectCatCondicion.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
     }
     
-    if(selectProd) {
-        selectProd.innerHTML = '<option value="">Selecciona el producto a regalar/descontar...</option>';
-        productosGlobales.forEach(p => selectProd.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio})</option>`);
+    if(promoOfertaCategoria) {
+        promoOfertaCategoria.innerHTML = '<option value="">Todas las categorías</option>';
+        categoriasGlobales.forEach(c => promoOfertaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
     }
+
+    filtrarProductosPromo(); // Llena inicialmente con todos los productos
+}
+
+// Filtro Cascada 1: Categoría -> Subcategoría
+function actualizarSubcategoriasPromo(catName) {
+    if(!promoOfertaSubcategoria) return;
+    promoOfertaSubcategoria.innerHTML = '<option value="">Todas las subcategorías</option>';
+    
+    if (!catName) {
+        promoOfertaSubcategoria.disabled = true;
+        promoOfertaSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+        return;
+    }
+
+    const cat = categoriasGlobales.find(c => c.nombre === catName);
+    if (cat && cat.subcategorias && cat.subcategorias.length > 0) {
+        promoOfertaSubcategoria.disabled = false;
+        promoOfertaSubcategoria.classList.remove('bg-gray-50', 'text-gray-500');
+        cat.subcategorias.forEach(sub => {
+            promoOfertaSubcategoria.innerHTML += `<option value="${sub}">${sub}</option>`;
+        });
+    } else {
+        promoOfertaSubcategoria.disabled = true;
+        promoOfertaSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
+    }
+}
+
+// Filtro Cascada 2: Categoría+Subcategoría -> Productos
+function filtrarProductosPromo() {
+    if(!promoOfertaProducto) return;
+    const cat = promoOfertaCategoria ? promoOfertaCategoria.value : '';
+    const subcat = promoOfertaSubcategoria ? promoOfertaSubcategoria.value : '';
+    
+    promoOfertaProducto.innerHTML = '<option value="">Selecciona el producto a regalar/descontar...</option>';
+
+    const filtrados = productosGlobales.filter(p => {
+        const matchCat = cat === '' || p.categoria === cat;
+        const matchSub = subcat === '' || p.subcategoria === subcat;
+        return matchCat && matchSub;
+    });
+
+    filtrados.forEach(p => {
+        promoOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio})</option>`;
+    });
 }
 
 async function cargarPromociones() {
     const tbody = document.getElementById('admin-promos-list');
-    actualizarSelectsPromociones(); // Actualiza los selectores del formulario
+    actualizarSelectsPromocionesIniciales(); 
     
     try {
         const querySnapshot = await getDocs(promosCollection);
@@ -315,7 +377,6 @@ async function cargarPromociones() {
                 ? `Lleva <b>${p.cantidadCondicion}</b> de <b>${p.categoriaCondicion}</b>` 
                 : `Lleva <b>${p.cantidadCondicion}</b> de cualquier producto`;
                 
-            // Buscar nombre del producto ofertado
             const prodOfrecido = productosGlobales.find(x => x.id === p.productoOfertaId);
             const ofertaText = prodOfrecido 
                 ? `<span class="text-brand-pink font-bold">${p.porcentajeDescuento}% off</span> en ${prodOfrecido.nombre}` 
@@ -364,8 +425,18 @@ window.prepararEdicionPromo = (id) => {
     document.getElementById('promo-nombre').value = p.nombre;
     document.getElementById('promo-condicion-categoria').value = p.categoriaCondicion || '';
     document.getElementById('promo-condicion-cantidad').value = p.cantidadCondicion || 1;
-    document.getElementById('promo-oferta-producto').value = p.productoOfertaId;
     document.getElementById('promo-oferta-descuento').value = p.porcentajeDescuento || 30;
+
+    // Magia para reconstruir los filtros en cascada según el producto guardado
+    const prod = productosGlobales.find(x => x.id === p.productoOfertaId);
+    if(prod) {
+        if(promoOfertaCategoria) promoOfertaCategoria.value = prod.categoria || '';
+        actualizarSubcategoriasPromo(prod.categoria);
+        if(promoOfertaSubcategoria) promoOfertaSubcategoria.value = prod.subcategoria || '';
+        filtrarProductosPromo();
+        if(promoOfertaProducto) promoOfertaProducto.value = prod.id;
+    }
+
     document.getElementById('modal-titulo-promo').innerText = "Editar Promoción";
     modalPromocion.classList.remove('hidden');
 };
@@ -378,7 +449,6 @@ window.eliminarPromo = async (id) => {
 
 // ==========================================
 // MÓDULOS ANTERIORES: CATEGORÍAS, PRODUCTOS, CLIENTES Y PEDIDOS
-// (Esta lógica se mantiene 100% igual)
 // ==========================================
 
 async function cargarCategorias() {
@@ -530,7 +600,7 @@ window.eliminarProducto = async (id) => { if(confirm("¿Seguro que deseas elimin
 function exportarProductosExcel() {
     if (productosFiltrados.length === 0) return alert("No hay productos para exportar.");
     const datosLimpios = productosFiltrados.map(p => ({ "ID Producto": p.id, "Nombre": p.nombre, "Categoría": p.categoria, "Subcategoría": p.subcategoria, "Precio ($)": p.precio, "Stock Físico": p.stock, "Descripción": p.descripcion || 'N/A', "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0, "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A' }));
-    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Inventario"); XLSX.writeFile(libro, "Inventario_Filtrado_D&S.xlsx");
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Inventario"); XLSX.writeFile(libro, "Inventario_Filtrado.xlsx");
 }
 
 async function cargarClientes() {
