@@ -29,17 +29,18 @@ async function initApp() {
     setupMobileMenu();
     setupLoginModal();
     monitorAuthState();
+    setupLightbox(); // Inicializar el zoom de imágenes
     
     // 1. Cargar configuraciones del Administrador
     await cargarConfiguracionPublica();
     await cargarMetodosPago();
     await cargarPromocionesPublicas();
 
-    // 2. Cargar Catálogo
-    cargarCategoriasPublicas();
-    cargarProductosPublicos();
+    // 2. Cargar Catálogo (AWAIT vital para evitar que el carrito se dibuje sin productos en memoria tras un reload)
+    await cargarCategoriasPublicas();
+    await cargarProductosPublicos();
     
-    // 3. Inicializar Módulos Locales
+    // 3. Inicializar Módulos Locales (Ahora el catálogo ya existe en memoria)
     cargarCarritoLocal();
     setupModalDetalle();
     setupCheckout(); 
@@ -256,8 +257,25 @@ window.limpiarFiltros = () => {
 };
 
 // ==========================================
-// LÓGICA DEL MODAL DE DETALLES DEL PRODUCTO
+// LÓGICA DEL MODAL DE DETALLES Y LIGHTBOX
 // ==========================================
+
+function setupLightbox() {
+    const modalLightbox = document.getElementById('modal-lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const btnCerrarLightbox = document.getElementById('btn-cerrar-lightbox');
+
+    if(btnCerrarLightbox) {
+        btnCerrarLightbox.addEventListener('click', () => modalLightbox.classList.add('hidden'));
+    }
+    
+    // Cerrar si hace clic fuera de la imagen
+    if(modalLightbox) {
+        modalLightbox.addEventListener('click', (e) => {
+            if(e.target === modalLightbox) modalLightbox.classList.add('hidden');
+        });
+    }
+}
 
 function setupModalDetalle() {
     const modal = document.getElementById('modal-detalle-producto');
@@ -266,7 +284,20 @@ function setupModalDetalle() {
     const btnSumar = document.getElementById('btn-sumar-qty');
     const inputQty = document.getElementById('detalle-qty');
     const btnAgregar = document.getElementById('btn-agregar-carrito');
+    const imgContainerZoom = document.querySelector('.cursor-zoom-in');
+    
     let currentProductId = null; 
+
+    // Al hacer clic en la imagen principal, abrir el Lightbox (Zoom)
+    if (imgContainerZoom) {
+        imgContainerZoom.addEventListener('click', () => {
+            const src = document.getElementById('detalle-img-principal').src;
+            if(src) {
+                document.getElementById('lightbox-img').src = src;
+                document.getElementById('modal-lightbox').classList.remove('hidden');
+            }
+        });
+    }
 
     if(btnCerrar) btnCerrar.addEventListener('click', () => modal.classList.add('hidden'));
 
@@ -291,7 +322,10 @@ function setupModalDetalle() {
     }
 
     window.abrirModalDetalle = (id) => {
-        const prod = window.productosPublicos.find(p => p.id === id); if(!prod) return;
+        // Asegurarnos de limpiar IDs de promociones para buscar el producto real
+        const idReal = id.replace('_promo', '');
+        const prod = window.productosPublicos.find(p => p.id === idReal); 
+        if(!prod) return;
         currentProductId = prod.id; 
 
         document.getElementById('detalle-categoria').textContent = prod.categoria;
@@ -320,6 +354,10 @@ function setupModalDetalle() {
                 });
             }
         }
+        
+        // Si el carrito está abierto, lo cerramos sutilmente para dar prioridad a la vista del producto
+        if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
+        
         modal.classList.remove('hidden');
     };
 
@@ -416,7 +454,6 @@ window.eliminarDelCarrito = (idProducto) => {
     guardarCarritoLocal();
 };
 
-// DIBUJA EL CARRITO Y EVALÚA LAS PROMOS DINÁMICAS
 function renderizarCarrito() {
     const contenedor = document.getElementById('cart-items-container');
     const badge = document.getElementById('cart-count');
@@ -439,20 +476,35 @@ function renderizarCarrito() {
 
     contenedor.innerHTML = '';
     
-    // 1. Dibujar los productos comprados
+    // 1. Dibujar los productos comprados (CON IMÁGENES Y NOMBRES CLICABLES)
     carritoCompras.forEach(item => {
         totalItems += item.cantidad; subtotalGlobal += (item.precio * item.cantidad);
         
-        // Estilo sutil para items de promoción
         const estiloOferta = item.id.includes('_promo') ? 'border-brand-blue border-dashed bg-blue-50/50 border-2' : 'border-gray-100 bg-white border';
+        const idReal = item.productoOriginalId || item.id; // Para que el Modal Detalle sepa qué abrir
         
-        contenedor.innerHTML += `<div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative"><img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50"><div class="flex-1"><h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1">${item.nombre}</h4><p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p><div class="flex items-center gap-3 mt-2"><div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white"><button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button><span class="px-2 text-sm font-bold text-gray-800">${item.cantidad}</span><button onclick="modificarCantidadCarrito('${item.id}', 1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-plus"></i></button></div></div></div><button onclick="eliminarDelCarrito('${item.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded-full"><i class="ph-fill ph-trash text-lg"></i></button></div>`;
+        contenedor.innerHTML += `
+        <div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative">
+            <img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${idReal}')" title="Ver detalles">
+            <div class="flex-1">
+                <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${idReal}')">${item.nombre}</h4>
+                <p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p>
+                <div class="flex items-center gap-3 mt-2">
+                    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+                        <button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button>
+                        <span class="px-2 text-sm font-bold text-gray-800">${item.cantidad}</span>
+                        <button onclick="modificarCantidadCarrito('${item.id}', 1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-plus"></i></button>
+                    </div>
+                </div>
+            </div>
+            <button onclick="eliminarDelCarrito('${item.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors p-1 bg-white rounded-full"><i class="ph-fill ph-trash text-lg"></i></button>
+        </div>`;
     });
 
-    // 2. Evaluar y mostrar Banner Promocional (Estilo Elegante)
+    // 2. Evaluar y mostrar Banner Promocional (CON IMAGEN Y NOMBRE CLICABLES)
     let promoMostrada = false;
     promocionesPublicas.forEach(promo => {
-        if (promoMostrada) return; // Solo mostramos 1 banner a la vez
+        if (promoMostrada) return;
 
         const prodOferta = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
         if (!prodOferta) return;
@@ -473,7 +525,6 @@ function renderizarCarrito() {
                 promoMostrada = true;
                 const precioConDescuento = prodOferta.precio * (1 - (promo.porcentajeDescuento / 100));
 
-                // Nuevo diseño súper profesional y nada infantil
                 contenedor.innerHTML += `
                     <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 relative mb-2 shadow-sm">
                         <div class="flex items-start gap-2 mb-2">
@@ -485,9 +536,9 @@ function renderizarCarrito() {
                         </div>
                         
                         <div class="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-100 mt-3">
-                            <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-md border border-gray-100">
+                            <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-md border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${prodOferta.id}')" title="Ver detalles">
                             <div class="flex-1">
-                                <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2">${prodOferta.nombre}</h4>
+                                <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${prodOferta.id}')">${prodOferta.nombre}</h4>
                                 <div class="flex items-baseline gap-2 mt-1">
                                     <span class="text-xs text-gray-400 line-through">$${prodOferta.precio.toFixed(2)}</span>
                                     <span class="text-lg font-black text-brand-blue">$${precioConDescuento.toFixed(2)}</span>
@@ -608,7 +659,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO (CON ESCUDO DE INVENTARIO)
+    // CONFIRMAR PEDIDO (ESCUDO DE INVENTARIO ACTIVADO)
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
