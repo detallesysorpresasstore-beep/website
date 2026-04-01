@@ -25,10 +25,11 @@ const buscadorProductos = document.getElementById('buscador-productos');
 const filtroCategoria = document.getElementById('filtro-categoria');
 const filtroSubcategoria = document.getElementById('filtro-subcategoria');
 
-// Modales y Botones de Categorías
+// Modales, Botones y Filtros de Categorías
 const modalCategoria = document.getElementById('modal-categoria');
 const btnNuevaCategoria = document.getElementById('btn-nueva-categoria');
 const btnGuardarCategoria = document.getElementById('btn-guardar-categoria');
+const buscadorCategorias = document.getElementById('buscador-categorias'); // NUEVO
 
 // Modales y Botones de Subcategorías
 const modalSubcategoria = document.getElementById('modal-subcategoria');
@@ -36,14 +37,19 @@ const btnNuevaSubcategoria = document.getElementById('btn-nueva-subcategoria');
 const btnGuardarSubcategoria = document.getElementById('btn-guardar-subcategoria');
 const selectSubcatParent = document.getElementById('subcat-parent');
 
-// Modales y Botones de Pedidos
+// Modales, Botones y Filtros de Pedidos
 const modalPedido = document.getElementById('modal-pedido');
 const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
+const filtroFechaPedidos = document.getElementById('filtro-fecha-pedidos'); // NUEVO
+const filtroEstadoPedidos = document.getElementById('filtro-estado-pedidos'); // NUEVO
 
-// Botones de Clientes
+// Botones y Filtros de Clientes
 const btnExportarClientes = document.getElementById('btn-exportar-clientes');
+const buscadorClientes = document.getElementById('buscador-clientes'); // NUEVO
+const filtroRolClientes = document.getElementById('filtro-rol-clientes'); // NUEVO
+const filtroFechaClientes = document.getElementById('filtro-fecha-clientes'); // NUEVO
 
-// NUEVO: Botón de Configuración
+// Botón de Configuración
 const btnGuardarConfiguracion = document.getElementById('btn-guardar-configuracion');
 
 // Referencias a Colecciones en Firestore
@@ -51,13 +57,15 @@ const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
 const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users");
-const configDocRef = doc(db, "config", "store_settings"); // NUEVO: Documento único de configuración
+const configDocRef = doc(db, "config", "store_settings");
 
 // Variables Globales
 let productosGlobales = [];
 let productosFiltrados = [];
 let categoriasGlobales = []; 
+let pedidosGlobales = []; // NUEVO
 let clientesGlobales = []; 
+let clientesFiltrados = []; // NUEVO
 let arrayImagenesUrls = [];
 
 // ==========================================
@@ -68,8 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     verificarSeguridad();
     configurarEventos();
     
-    // Cargas iniciales
-    cargarConfiguracion(); // Cargar la tasa y datos bancarios
+    cargarConfiguracion(); 
     cargarCategorias().then(() => {
         cargarProductos();
     });
@@ -105,15 +112,9 @@ function configurarEventos() {
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
 
-    selectProdCategoria.addEventListener('change', (e) => {
-        actualizarSelectSubcategoriasFormulario(e.target.value);
-    });
-
+    selectProdCategoria.addEventListener('change', (e) => actualizarSelectSubcategoriasFormulario(e.target.value));
     buscadorProductos.addEventListener('input', aplicarFiltrosProductos);
-    filtroCategoria.addEventListener('change', () => {
-        actualizarSelectSubcategoriasFiltro();
-        aplicarFiltrosProductos();
-    });
+    filtroCategoria.addEventListener('change', () => { actualizarSelectSubcategoriasFiltro(); aplicarFiltrosProductos(); });
     filtroSubcategoria.addEventListener('change', aplicarFiltrosProductos);
 
     // ---- EVENTOS CATEGORÍAS PRINCIPALES ----
@@ -124,6 +125,8 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
+    
+    if (buscadorCategorias) buscadorCategorias.addEventListener('input', aplicarFiltrosCategorias);
 
     // ---- EVENTOS SUBCATEGORÍAS ----
     if (btnNuevaSubcategoria) {
@@ -136,13 +139,21 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
     if (btnGuardarSubcategoria) btnGuardarSubcategoria.addEventListener('click', guardarSubcategoria);
 
-    // ---- EVENTOS PEDIDOS / CLIENTES ----
+    // ---- EVENTOS PEDIDOS ----
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
-    if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
+    
+    if (filtroFechaPedidos) filtroFechaPedidos.addEventListener('change', aplicarFiltrosPedidos);
+    if (filtroEstadoPedidos) filtroEstadoPedidos.addEventListener('change', aplicarFiltrosPedidos);
 
-    // ---- NUEVO: EVENTOS CONFIGURACIÓN ----
+    // ---- EVENTOS CLIENTES ----
+    if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
+    if (buscadorClientes) buscadorClientes.addEventListener('input', aplicarFiltrosClientes);
+    if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
+    if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
+
+    // ---- EVENTOS CONFIGURACIÓN ----
     if (btnGuardarConfiguracion) btnGuardarConfiguracion.addEventListener('click', guardarConfiguracion);
 }
 
@@ -167,9 +178,7 @@ async function cargarConfiguracion() {
             if (inputZelle) inputZelle.value = data.zelle || '';
             if (inputBinance) inputBinance.value = data.binance || '';
         }
-    } catch (error) {
-        console.error("Error cargando configuración:", error);
-    }
+    } catch (error) { console.error("Error cargando configuración:", error); }
 }
 
 async function guardarConfiguracion() {
@@ -185,16 +194,9 @@ async function guardarConfiguracion() {
     const binance = document.getElementById('config-binance').value.trim();
 
     try {
-        // Usamos { merge: true } para crear el documento si no existe, o actualizarlo si ya existe
         await setDoc(configDocRef, {
-            tasaBcv: tasaBcv,
-            pagoMovil: pagoMovil,
-            transferencia: transferencia,
-            zelle: zelle,
-            binance: binance,
-            fechaActualizacion: new Date().toISOString()
+            tasaBcv, pagoMovil, transferencia, zelle, binance, fechaActualizacion: new Date().toISOString()
         }, { merge: true });
-        
         alert("¡Configuración de la tienda guardada con éxito!");
     } catch (error) {
         console.error("Error al guardar configuración:", error);
@@ -210,46 +212,62 @@ async function guardarConfiguracion() {
 // ==========================================
 
 async function cargarCategorias() {
-    const tbody = document.getElementById('admin-categories-list');
     try {
         const querySnapshot = await getDocs(categoriesCollection);
-        tbody.innerHTML = '';
-        selectProdCategoria.innerHTML = '<option value="">Seleccionar categoría...</option>';
+        const selectProd = document.getElementById('prod-categoria');
+        
+        selectProd.innerHTML = '<option value="">Seleccionar categoría...</option>';
         filtroCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
         selectSubcatParent.innerHTML = '<option value="">Selecciona la categoría principal...</option>'; 
         categoriasGlobales = [];
-
-        if (querySnapshot.empty) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No hay categorías. Crea una.</td></tr>';
-            return;
-        }
 
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
             cat.id = docSnap.id;
             categoriasGlobales.push(cat); 
 
-            const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) 
-                ? cat.subcategorias.map(s => `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-xs mr-1 mb-1">${s}</span>`).join('') 
-                : '<span class="text-gray-400 italic">Sin subcategorías</span>';
-
-            tbody.innerHTML += `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4 font-medium text-gray-800">${cat.nombre}</td>
-                    <td class="p-4 text-gray-600">${subcatsTexto}</td>
-                    <td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td>
-                    <td class="p-4 text-center">
-                        <button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1">
-                            <i class="ph ph-trash text-xl"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-            selectProdCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
+            selectProd.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
             filtroCategoria.innerHTML += `<option value="${cat.nombre}">${cat.nombre}</option>`;
             selectSubcatParent.innerHTML += `<option value="${cat.id}">${cat.nombre}</option>`; 
         });
+
+        aplicarFiltrosCategorias(); // Dibuja la tabla
     } catch (error) { console.error("Error cargando categorías:", error); }
+}
+
+function aplicarFiltrosCategorias() {
+    const texto = buscadorCategorias ? buscadorCategorias.value.toLowerCase() : '';
+    const filtradas = categoriasGlobales.filter(c => c.nombre.toLowerCase().includes(texto));
+    dibujarTablaCategorias(filtradas);
+}
+
+function dibujarTablaCategorias(arreglo) {
+    const tbody = document.getElementById('admin-categories-list');
+    tbody.innerHTML = '';
+
+    if (arreglo.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No se encontraron categorías.</td></tr>';
+        return;
+    }
+
+    arreglo.forEach(cat => {
+        const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) 
+            ? cat.subcategorias.map(s => `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-xs mr-1 mb-1">${s}</span>`).join('') 
+            : '<span class="text-gray-400 italic">Sin subcategorías</span>';
+
+        tbody.innerHTML += `
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="p-4 font-medium text-gray-800">${cat.nombre}</td>
+                <td class="p-4 text-gray-600">${subcatsTexto}</td>
+                <td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td>
+                <td class="p-4 text-center">
+                    <button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1">
+                        <i class="ph ph-trash text-xl"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
 }
 
 async function guardarCategoria() {
@@ -257,9 +275,7 @@ async function guardarCategoria() {
     const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
     if (!nombre) return alert("El nombre es obligatorio.");
 
-    btnGuardarCategoria.disabled = true;
-    btnGuardarCategoria.innerText = "Guardando...";
-
+    btnGuardarCategoria.disabled = true; btnGuardarCategoria.innerText = "Guardando...";
     try {
         await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] });
         modalCategoria.classList.add('hidden');
@@ -273,9 +289,7 @@ async function guardarSubcategoria() {
     const subName = document.getElementById('subcat-nombre').value.trim();
 
     if (!parentId || !subName) return alert("Selecciona una categoría padre y escribe un nombre.");
-
-    btnGuardarSubcategoria.disabled = true;
-    btnGuardarSubcategoria.innerText = "Guardando...";
+    btnGuardarSubcategoria.disabled = true; btnGuardarSubcategoria.innerText = "Guardando...";
 
     try {
         const categoriaPadre = categoriasGlobales.find(c => c.id === parentId);
@@ -308,8 +322,7 @@ function actualizarSelectSubcategoriasFormulario(categoriaNombre, subcategoriaSe
     const selectSub = document.getElementById('prod-subcategoria');
     selectSub.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
     if (!categoriaNombre) {
-        selectSub.disabled = true; selectSub.classList.add('bg-gray-50', 'text-gray-500');
-        return;
+        selectSub.disabled = true; selectSub.classList.add('bg-gray-50', 'text-gray-500'); return;
     }
     const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === categoriaNombre);
     if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
@@ -327,8 +340,7 @@ function actualizarSelectSubcategoriasFiltro() {
     const catFiltro = filtroCategoria.value;
     filtroSubcategoria.innerHTML = '<option value="">Todas las Subcategorías</option>';
     if (catFiltro === "") {
-        filtroSubcategoria.disabled = true; filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500');
-        return;
+        filtroSubcategoria.disabled = true; filtroSubcategoria.classList.add('bg-gray-50', 'text-gray-500'); return;
     }
     const categoriaEncontrada = categoriasGlobales.find(c => c.nombre === catFiltro);
     if (categoriaEncontrada && categoriaEncontrada.subcategorias && categoriaEncontrada.subcategorias.length > 0) {
@@ -346,11 +358,9 @@ function actualizarSelectSubcategoriasFiltro() {
 async function manejarSubidaMultiplesImagenes(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    btnGuardarProducto.disabled = true;
-    const textoOriginal = btnGuardarProducto.innerText;
+    btnGuardarProducto.disabled = true; const textoOriginal = btnGuardarProducto.innerText;
     for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        btnGuardarProducto.innerText = `Subiendo ${i + 1}/${files.length}...`;
+        const file = files[i]; btnGuardarProducto.innerText = `Subiendo ${i + 1}/${files.length}...`;
         try {
             const formData = new FormData(); formData.append('image', file);
             const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
@@ -363,8 +373,7 @@ async function manejarSubidaMultiplesImagenes(event) {
 }
 
 function renderizarGaleria() {
-    const galeria = document.getElementById('galeria-preview');
-    galeria.innerHTML = '';
+    const galeria = document.getElementById('galeria-preview'); galeria.innerHTML = '';
     arrayImagenesUrls.forEach((url, index) => {
         galeria.innerHTML += `<div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square"><img src="${url}" class="w-full h-full object-cover"><button type="button" onclick="quitarImagen(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-x text-xs"></i></button></div>`;
     });
@@ -381,7 +390,7 @@ async function guardarProducto() {
     const descripcion = document.getElementById('prod-descripcion').value.trim();
 
     if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) {
-        return alert("Completa los datos obligatorios (incluyendo subcategoría) y sube al menos una foto.");
+        return alert("Completa los datos obligatorios y sube al menos una foto.");
     }
     btnGuardarProducto.disabled = true; btnGuardarProducto.innerText = "Guardando...";
 
@@ -425,8 +434,7 @@ function aplicarFiltrosProductos() {
 }
 
 function dibujarTablaProductos(arreglo) {
-    const tbody = document.getElementById('admin-products-list');
-    tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-products-list'); tbody.innerHTML = '';
     if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos.</td></tr>'; return; }
     arreglo.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
@@ -464,47 +472,123 @@ function exportarProductosExcel() {
 }
 
 // ==========================================
-// MÓDULOS RESTANTES (Clientes y Pedidos)
+// MÓDULO: CLIENTES (DIRECTORIO Y FILTROS)
 // ==========================================
 async function cargarClientes() {
-    const tbody = document.getElementById('admin-clients-list');
     try {
-        const querySnapshot = await getDocs(usersCollection); tbody.innerHTML = ''; clientesGlobales = []; 
-        if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No hay usuarios registrados.</td></tr>'; return; }
+        const querySnapshot = await getDocs(usersCollection);
+        clientesGlobales = []; 
         querySnapshot.forEach((docSnap) => {
-            const user = docSnap.data(); clientesGlobales.push(user);
-            const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
-            const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
-            const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-            tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
+            const user = docSnap.data();
+            clientesGlobales.push(user);
         });
+        aplicarFiltrosClientes();
     } catch (error) { console.error(error); }
 }
 
-function exportarClientesExcel() {
-    if (clientesGlobales.length === 0) return alert("No hay clientes para exportar.");
-    const datosLimpios = clientesGlobales.map(c => ({
-        "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A', "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente', "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
-    }));
-    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Clientes.xlsx");
+function aplicarFiltrosClientes() {
+    const texto = buscadorClientes ? buscadorClientes.value.toLowerCase() : '';
+    const rol = filtroRolClientes ? filtroRolClientes.value : '';
+    const fecha = filtroFechaClientes ? filtroFechaClientes.value : '';
+
+    clientesFiltrados = clientesGlobales.filter(c => {
+        const nombre = (c.name || '').toLowerCase();
+        const email = (c.email || '').toLowerCase();
+        const coincideTexto = nombre.includes(texto) || email.includes(texto);
+        const coincideRol = rol === "" || c.role === rol;
+        
+        let coincideFecha = true;
+        if(fecha) {
+            const fechaReg = c.createdAt ? c.createdAt.split('T')[0] : '';
+            coincideFecha = fechaReg === fecha;
+        }
+
+        return coincideTexto && coincideRol && coincideFecha;
+    });
+
+    dibujarTablaClientes(clientesFiltrados);
 }
 
+function dibujarTablaClientes(arreglo) {
+    const tbody = document.getElementById('admin-clients-list');
+    tbody.innerHTML = '';
+    if (arreglo.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron clientes.</td></tr>';
+        return;
+    }
+    arreglo.forEach((user) => {
+        const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
+        const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
+        const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
+        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
+    });
+}
+
+function exportarClientesExcel() {
+    if (clientesFiltrados.length === 0) return alert("No hay clientes para exportar.");
+    const datosLimpios = clientesFiltrados.map(c => ({
+        "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A',
+        "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente',
+        "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'
+    }));
+    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
+}
+
+// ==========================================
+// MÓDULO: PEDIDOS (Y FILTROS)
+// ==========================================
 async function cargarPedidos() {
-    const tbody = document.getElementById('admin-orders-list');
     try {
-        const querySnapshot = await getDocs(ordersCollection); tbody.innerHTML = '';
-        if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Aún no hay pedidos en la tienda.</td></tr>'; return; }
+        const querySnapshot = await getDocs(ordersCollection);
+        pedidosGlobales = [];
         querySnapshot.forEach((docSnap) => {
-            const pedido = docSnap.data(); const id = docSnap.id;
-            let colorEstado = 'bg-gray-100 text-gray-600';
-            if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700';
-            if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700';
-            if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700';
-            if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700';
-            if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
-            tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.total.toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${id}', '${pedido.estado}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
+            const pedido = docSnap.data(); 
+            pedido.id = docSnap.id;
+            pedidosGlobales.push(pedido);
         });
-    } catch (error) {}
+        aplicarFiltrosPedidos();
+    } catch (error) { console.error(error); }
+}
+
+function aplicarFiltrosPedidos() {
+    const fecha = filtroFechaPedidos ? filtroFechaPedidos.value : '';
+    const estado = filtroEstadoPedidos ? filtroEstadoPedidos.value : '';
+
+    const filtrados = pedidosGlobales.filter(p => {
+        const coincideEstado = estado === "" || p.estado === estado;
+        let coincideFecha = true;
+        if(fecha) {
+            const fechaPedido = p.fecha ? p.fecha.split('T')[0] : '';
+            coincideFecha = fechaPedido === fecha;
+        }
+        return coincideEstado && coincideFecha;
+    });
+
+    dibujarTablaPedidos(filtrados);
+}
+
+function dibujarTablaPedidos(arreglo) {
+    const tbody = document.getElementById('admin-orders-list');
+    tbody.innerHTML = '';
+    
+    if (arreglo.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron pedidos.</td></tr>';
+        return;
+    }
+
+    // Ordenar de más reciente a más antiguo (opcional pero recomendado)
+    arreglo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    arreglo.forEach((pedido) => {
+        let colorEstado = 'bg-gray-100 text-gray-600';
+        if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700';
+        if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700';
+        if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700';
+        if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700';
+        if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
+        
+        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.total.toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}', '${pedido.estado}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
+    });
 }
 
 window.abrirModalPedido = (id, estadoActual) => {
