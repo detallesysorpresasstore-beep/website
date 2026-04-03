@@ -36,6 +36,9 @@ async function initApp() {
     await cargarCategoriasPublicas();
     await cargarProductosPublicos();
     
+    // NUEVO: Iniciar el slider dinámico de la página principal
+    iniciarSliderHero();
+    
     cargarCarritoLocal();
     setupModalDetalle();
     setupCheckout(); 
@@ -279,6 +282,92 @@ window.limpiarFiltros = () => {
     if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-pink">Nuevo</span>`;
     renderizarCatalogo(window.productosPublicos);
 };
+
+// ==========================================
+// NUEVO MÓDULO: SLIDER DINÁMICO (HERO)
+// ==========================================
+window.diapositivasHero = [];
+let slideIndexActual = 0;
+let heroSliderInterval = null;
+
+function iniciarSliderHero() {
+    const container = document.getElementById('hero-slider-container');
+    if (!container) return;
+
+    window.diapositivasHero = [];
+
+    // 1. Agregar Promociones a las diapositivas (Tienen prioridad)
+    promocionesPublicas.forEach(promo => {
+        const prod = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
+        if (prod && prod.imagenes && prod.imagenes.length > 0) {
+            window.diapositivasHero.push({
+                id: prod.id,
+                tipo: 'promo',
+                etiqueta: '🎁 ' + promo.nombre,
+                titulo: prod.nombre,
+                descripcion: `¡Oferta Especial! Aprovecha un ${promo.porcentajeDescuento}% de descuento cumpliendo las condiciones de compra.`,
+                imagen: prod.imagenes[0]
+            });
+        }
+    });
+
+    // 2. Extraer 1 producto llamativo por cada Subcategoría
+    const subcategoriasVistas = new Set();
+    // Invertimos el arreglo para agarrar los más recientes primero
+    const productosInvertidos = [...window.productosPublicos].reverse(); 
+    
+    productosInvertidos.forEach(prod => {
+        const subcat = prod.subcategoria || 'General';
+        if (!subcategoriasVistas.has(subcat) && prod.imagenes && prod.imagenes.length > 0) {
+            subcategoriasVistas.add(subcat);
+            window.diapositivasHero.push({
+                id: prod.id,
+                tipo: 'producto',
+                etiqueta: `🌟 Colección ${prod.categoria}`,
+                titulo: prod.nombre,
+                descripcion: `Descubre nuestra variedad en la sección de ${subcat}. ¡Calidad garantizada para los consentidos de la casa!`,
+                imagen: prod.imagenes[0]
+            });
+        }
+    });
+
+    // Si la base de datos está vacía, dejamos el placeholder estático
+    if (window.diapositivasHero.length === 0) return;
+
+    // Iniciar el ciclo de fotos
+    dibujarSlideHero();
+    if(heroSliderInterval) clearInterval(heroSliderInterval);
+    heroSliderInterval = setInterval(siguienteSlideHero, 4000); // Cambia cada 4 segundos
+}
+
+function dibujarSlideHero() {
+    const container = document.getElementById('hero-slider-container');
+    if (!container || window.diapositivasHero.length === 0) return;
+
+    const slide = window.diapositivasHero[slideIndexActual];
+    // Colores diferentes si es una Promo o un Producto normal
+    const colorEtiqueta = slide.tipo === 'promo' ? 'bg-brand-pink text-white' : 'bg-white text-brand-blue';
+
+    container.innerHTML = `
+        <div class="absolute inset-0 w-full h-full cursor-pointer group animate-fade-in" onclick="abrirModalDetalle('${slide.id}')">
+            <img src="${slide.imagen}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-90"></div>
+            <div class="absolute bottom-0 left-0 right-0 p-5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2 shadow-sm ${colorEtiqueta}">
+                    ${slide.etiqueta}
+                </span>
+                <h3 class="text-white font-bold text-lg sm:text-xl leading-tight line-clamp-2 drop-shadow-md mb-1">${slide.titulo}</h3>
+                <p class="text-gray-200 text-xs sm:text-sm font-medium drop-shadow-md line-clamp-2">${slide.descripcion}</p>
+            </div>
+        </div>
+    `;
+}
+
+function siguienteSlideHero() {
+    slideIndexActual++;
+    if (slideIndexActual >= window.diapositivasHero.length) slideIndexActual = 0;
+    dibujarSlideHero();
+}
 
 // ==========================================
 // LÓGICA DEL MODAL DE DETALLES Y LIGHTBOX
@@ -576,7 +665,7 @@ function renderizarCarrito() {
 }
 
 // ==========================================
-// MÓDULO: CHECKOUT (PAGOS, ESCUDO Y WHATSAPP)
+// MÓDULO: CHECKOUT Y REDIRECCIÓN WA
 // ==========================================
 
 function setupCheckout() {
@@ -600,6 +689,8 @@ function setupCheckout() {
         btnProcesar.addEventListener('click', () => {
             if(!currentUser) {
                 if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
+                // NUEVO: Alerta visual y directa obligando a leer por qué debe registrarse
+                alert("🔒 Para continuar con el pago necesitamos que inicies sesión o registres tu cuenta. ¡Es rápido y muy fácil!");
                 document.getElementById('login-mensaje-checkout').classList.remove('hidden');
                 document.getElementById('modal-login').classList.remove('hidden');
                 return;
@@ -661,16 +752,9 @@ function setupCheckout() {
                 const formData = new FormData(); formData.append('image', file);
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) { 
-                    urlComprobantePago = data.data.url; 
-                    textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; 
-                } else {
-                    throw new Error("ImgBB Error");
-                }
-            } catch (error) { 
-                textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error (Imagen muy pesada)'; 
-                inputComprobante.value = ''; 
-            } 
+                if (data.success) { urlComprobantePago = data.data.url; textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; }
+                else throw new Error("Error ImgBB");
+            } catch (error) { textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error (Img pesada)'; inputComprobante.value = ''; } 
             finally { btnConfirmar.disabled = false; }
         });
     }
@@ -682,7 +766,7 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO
+    // CONFIRMAR PEDIDO Y WHATSAPP
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -696,10 +780,9 @@ function setupCheckout() {
             if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return alert("Debes subir la foto (capture) del pago.");
 
             const originalText = btnConfirmar.innerHTML;
-            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Procesando...';
+            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
 
             try {
-                // ESCUDO DE INVENTARIO
                 let problemasStock = [];
                 for (const item of carritoCompras) {
                     const idRealBaseDB = item.productoOriginalId || item.id;
@@ -714,7 +797,7 @@ function setupCheckout() {
                     btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText; return; 
                 }
 
-                btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando...';
+                btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando Compra...';
 
                 let totalFinalUSD = subtotalGlobal;
                 if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
@@ -742,21 +825,21 @@ function setupCheckout() {
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
                 }
 
-                // MENSAJE WA
-                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido. 🛍️\n\n`;
+                // Generar Mensaje WhatsApp
+                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
                 mensajeWa += `🧾 *Orden:* #${orderRef.id.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
-                mensajeWa += `💵 *Total:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
+                mensajeWa += `💵 *Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
                 
                 if (orderData.monedaSecundaria === 'VES' || orderData.monedaSecundaria === 'COP') {
                      const monedaSimbolo = orderData.monedaSecundaria === 'VES' ? 'Bs.' : '$ COP';
                      mensajeWa += `🔄 *Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
                 }
                 
-                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Ref:* ${orderData.referencia}\n`;
-                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante guardado en la web.*\n`;
+                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Referencia:* ${orderData.referencia}\n`;
+                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante adjunto en el sistema.*\n`;
                 
-                mensajeWa += `\n📍 *Dir:* ${orderData.direccion}`;
+                mensajeWa += `\n📍 *Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
 
                 const encodedMensaje = encodeURIComponent(mensajeWa);
                 const numeroWa = configuracionTienda.whatsapp ? configuracionTienda.whatsapp.replace(/\D/g,'') : '';
@@ -764,17 +847,8 @@ function setupCheckout() {
                 carritoCompras = []; guardarCarritoLocal(); urlComprobantePago = '';
                 
                 if (numeroWa) {
-                    alert("¡Pedido registrado con éxito! Serás redirigido a WhatsApp.");
-                    
-                    // SOLUCIÓN WHATSAPP INFALIBLE: Usar enlace oculto
-                    const link = document.createElement('a');
-                    link.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
-                    link.target = '_blank';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    setTimeout(() => { cerrarCheckout(); window.location.reload(); }, 1500);
+                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito. Presiona 'Aceptar' para ir a WhatsApp y confirmar tu envío.");
+                    window.location.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
                 } else {
                     alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
                     cerrarCheckout(); window.location.reload(); 
