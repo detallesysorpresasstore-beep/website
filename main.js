@@ -1,10 +1,11 @@
 /**
- * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública, Auth, Carrito, Checkout y Promociones)
+ * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública)
  */
 
 import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Añadimos runTransaction para el escudo de inventario infalible
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 
@@ -107,7 +108,8 @@ function monitorAuthState() {
         if (user) {
             if (btnLoginIcon) { btnLoginIcon.classList.remove('ph'); btnLoginIcon.classList.add('text-brand-orange', 'ph-fill'); }
             if(btnLoginMovil) btnLoginMovil.textContent = "Mi Perfil";
-            const userDoc = await getDoc(doc(db, "artifacts/detalles-y-sorpresas-store/public/data/users", user.uid));
+            // CORRECCIÓN: Ruta limpia de usuarios
+            const userDoc = await getDoc(doc(db, "users", user.uid));
             if(userDoc.exists()) currentUserData = userDoc.data();
         } else {
             currentUserData = null;
@@ -176,13 +178,14 @@ function setupLoginModal() {
                     await signInWithEmailAndPassword(auth, email, password);
                     loginSuccess.textContent = '¡Bienvenido de nuevo!'; loginSuccess.classList.remove('hidden');
                     setTimeout(async () => {
-                        const userDoc = await getDoc(doc(db, "artifacts/detalles-y-sorpresas-store/public/data/users", auth.currentUser.uid));
+                        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
                         if(userDoc.exists() && userDoc.data().role === 'admin') window.location.href = 'admin.html';
                         else { modal.classList.add('hidden'); window.location.reload(); }
                     }, 1000);
                 } else {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    await setDoc(doc(db, "artifacts/detalles-y-sorpresas-store/public/data/users", userCredential.user.uid), {
+                    // CORRECCIÓN: Ruta limpia de usuarios
+                    await setDoc(doc(db, "users", userCredential.user.uid), {
                         name: name, email: email, phone: phone || '', role: 'client', createdAt: new Date().toISOString()
                     });
                     loginSuccess.textContent = '¡Cuenta creada con éxito!'; loginSuccess.classList.remove('hidden');
@@ -204,12 +207,15 @@ async function cargarCategoriasPublicas() {
     if (!contenedor) return;
     try {
         const querySnapshot = await getDocs(collection(db, "categories"));
-        contenedor.innerHTML = '';
         if (querySnapshot.empty) { contenedor.innerHTML = '<p class="col-span-full text-center text-gray-500">Próximamente nuevas categorías.</p>'; return; }
+        
+        // MEJORA: Construir HTML en memoria
+        let htmlTemporal = '';
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
-            contenedor.innerHTML += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 hover:border-brand-blue flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 text-brand-blue"></i><h3 class="font-semibold text-gray-700">${cat.nombre}</h3></a>`;
+            htmlTemporal += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 hover:border-brand-blue flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 text-brand-blue"></i><h3 class="font-semibold text-gray-700">${cat.nombre}</h3></a>`;
         });
+        contenedor.innerHTML = htmlTemporal;
     } catch (error) { console.error(error); }
 }
 
@@ -231,20 +237,21 @@ async function cargarProductosPublicos() {
 
 function renderizarCatalogo(productosAMostrar) {
     const contenedor = document.getElementById('public-products'); 
-    contenedor.innerHTML = '';
     
     if (productosAMostrar.length === 0) {
         contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`; 
         return;
     }
 
+    // MEJORA: Construir HTML en memoria para evitar tirones (lag) en celulares
+    let htmlTemporal = '';
     productosAMostrar.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
         let imgHTML = imgPortada.startsWith('http') 
             ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
             : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
             
-        contenedor.innerHTML += `
+        htmlTemporal += `
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md" onclick="abrirModalDetalle('${prod.id}')">
                 <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
                     ${imgHTML}
@@ -267,6 +274,7 @@ function renderizarCatalogo(productosAMostrar) {
             </div>
         `;
     });
+    contenedor.innerHTML = htmlTemporal;
 }
 
 window.filtrarPorCategoria = (categoriaNombre) => {
@@ -449,10 +457,13 @@ function setupModalDetalle() {
         if(prod.imagenes && prod.imagenes.length > 0 && prod.imagenes[0].startsWith('http')) {
             imgPrincipal.src = prod.imagenes[0];
             if(prod.imagenes.length > 1) {
+                // MEJORA DOM: HTML Temporal
+                let mHtml = '';
                 prod.imagenes.forEach((url, index) => {
                     const borderClass = index === 0 ? 'border-brand-blue' : 'border-transparent';
-                    contMiniaturas.innerHTML += `<button onclick="cambiarImagenPrincipal(this, '${url}')" class="miniatura-btn flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${borderClass} transition-colors p-1 bg-white"><img src="${url}" class="w-full h-full object-contain"></button>`;
+                    mHtml += `<button onclick="cambiarImagenPrincipal(this, '${url}')" class="miniatura-btn flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${borderClass} transition-colors p-1 bg-white"><img src="${url}" class="w-full h-full object-contain"></button>`;
                 });
+                contMiniaturas.innerHTML = mHtml;
             }
         }
         
@@ -573,7 +584,8 @@ function renderizarCarrito() {
         return;
     }
 
-    contenedor.innerHTML = '';
+    // MEJORA DOM: HTML Temporal
+    let htmlTemporal = '';
     
     carritoCompras.forEach(item => {
         totalItems += item.cantidad; subtotalGlobal += (item.precio * item.cantidad);
@@ -581,7 +593,7 @@ function renderizarCarrito() {
         const estiloOferta = item.id.includes('_promo') ? 'border-brand-blue border-dashed bg-blue-50/50 border-2' : 'border-gray-100 bg-white border';
         const idReal = item.productoOriginalId || item.id; 
         
-        contenedor.innerHTML += `
+        htmlTemporal += `
         <div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative">
             <img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${idReal}')" title="Ver detalles">
             <div class="flex-1">
@@ -622,7 +634,7 @@ function renderizarCarrito() {
                 promoMostrada = true;
                 const precioConDescuento = prodOferta.precio * (1 - (promo.porcentajeDescuento / 100));
 
-                contenedor.innerHTML += `
+                htmlTemporal += `
                     <div class="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-4 relative mb-2 shadow-sm">
                         <div class="flex items-start gap-2 mb-2">
                             <i class="ph-fill ph-check-circle text-green-500 text-lg mt-0.5"></i>
@@ -651,6 +663,8 @@ function renderizarCarrito() {
         }
     });
 
+    contenedor.innerHTML = htmlTemporal;
+
     badge.textContent = totalItems; badge.classList.remove('hidden');
     txtTotal.textContent = `$${subtotalGlobal.toFixed(2)}`;
     if(txtTotalBs) txtTotalBs.textContent = formatearMoneda(subtotalGlobal, 'VES');
@@ -658,7 +672,7 @@ function renderizarCarrito() {
 }
 
 // ==========================================
-// MÓDULO: CHECKOUT Y REDIRECCIÓN WA
+// MÓDULO: CHECKOUT (TRANSACCIONES FIRESTORE)
 // ==========================================
 
 function setupCheckout() {
@@ -758,7 +772,9 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // CONFIRMAR PEDIDO Y WHATSAPP
+    // ==========================================
+    // ESCUDO DE INVENTARIO INFALIBLE CON TRANSACCIONES
+    // ==========================================
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -772,53 +788,70 @@ function setupCheckout() {
             if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return alert("Debes subir la foto (capture) del pago.");
 
             const originalText = btnConfirmar.innerHTML;
-            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Verificando inventario...';
+            btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Asegurando Inventario...';
+
+            let totalFinalUSD = subtotalGlobal;
+            if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
+
+            const orderData = {
+                clienteId: currentUser.uid,
+                clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
+                clienteEmail: currentUser.email,
+                direccion: direccion,
+                metodoPago: metodoConfig.nombre, 
+                referencia: referencia || 'N/A',
+                comprobanteUrl: urlComprobantePago, 
+                productos: carritoCompras, 
+                totalUSD: totalFinalUSD,
+                monedaSecundaria: metodoConfig.moneda,
+                totalSecundario: metodoConfig.moneda === 'VES' ? parseFloat((totalFinalUSD * configuracionTienda.tasaBcv).toFixed(2)) : (metodoConfig.moneda === 'COP' ? parseFloat((totalFinalUSD * configuracionTienda.tasaCop).toFixed(2)) : 0),
+                estado: 'Pendiente',
+                fecha: new Date().toISOString()
+            };
+
+            let nuevaOrderRefID = '';
 
             try {
-                let problemasStock = [];
-                for (const item of carritoCompras) {
-                    const idRealBaseDB = item.productoOriginalId || item.id;
-                    const prodSnap = await getDoc(doc(db, "products", idRealBaseDB));
-                    if (prodSnap.exists()) {
-                        if (prodSnap.data().stock < item.cantidad) problemasStock.push(`- ${item.nombre}`);
-                    } else { problemasStock.push(`- ${item.nombre}`); }
-                }
+                // TRANSACCIÓN DE FIRESTORE: Lee todos los stocks, y si están bien, descuenta y crea la orden al mismo tiempo.
+                await runTransaction(db, async (transaction) => {
+                    let productosActualizar = [];
 
-                if (problemasStock.length > 0) {
-                    alert("¡Lo sentimos! El stock cambió y algunos productos ya no están disponibles:\n\n" + problemasStock.join("\n"));
-                    btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText; return; 
-                }
+                    // 1. Fase de Lectura (VITAL: En Firebase las lecturas van primero)
+                    for (const item of carritoCompras) {
+                        const idRealBaseDB = item.productoOriginalId || item.id;
+                        const prodRef = doc(db, "products", idRealBaseDB);
+                        const prodSnap = await transaction.get(prodRef);
 
-                btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Registrando Compra...';
+                        if (!prodSnap.exists()) {
+                            throw new Error(`El producto "${item.nombre}" ya no está en la tienda.`);
+                        }
+                        
+                        const stockActual = prodSnap.data().stock;
+                        if (stockActual < item.cantidad) {
+                            throw new Error(`¡Uy! Alguien más acaba de llevarse el último "${item.nombre}". Solo quedan ${stockActual} unidades.`);
+                        }
 
-                let totalFinalUSD = subtotalGlobal;
-                if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
+                        // Guardamos la referencia y el nuevo stock para la fase de escritura
+                        productosActualizar.push({
+                            ref: prodRef,
+                            nuevoStock: stockActual - item.cantidad
+                        });
+                    }
 
-                const orderData = {
-                    clienteId: currentUser.uid,
-                    clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
-                    clienteEmail: currentUser.email,
-                    direccion: direccion,
-                    metodoPago: metodoConfig.nombre, 
-                    referencia: referencia || 'N/A',
-                    comprobanteUrl: urlComprobantePago, 
-                    productos: carritoCompras, 
-                    totalUSD: totalFinalUSD,
-                    monedaSecundaria: metodoConfig.moneda,
-                    totalSecundario: metodoConfig.moneda === 'VES' ? parseFloat((totalFinalUSD * configuracionTienda.tasaBcv).toFixed(2)) : (metodoConfig.moneda === 'COP' ? parseFloat((totalFinalUSD * configuracionTienda.tasaCop).toFixed(2)) : 0),
-                    estado: 'Pendiente',
-                    fecha: new Date().toISOString()
-                };
+                    // 2. Fase de Escritura (Solo se ejecuta si TODO el stock anterior estaba correcto)
+                    for (const prod of productosActualizar) {
+                        transaction.update(prod.ref, { stock: prod.nuevoStock });
+                    }
 
-                const orderRef = await addDoc(collection(db, "orders"), orderData);
+                    // 3. Crear la Orden en la misma transacción
+                    const newOrderRef = doc(collection(db, "orders")); // Crea una referencia con ID nuevo
+                    transaction.set(newOrderRef, orderData);
+                    nuevaOrderRefID = newOrderRef.id; 
+                });
 
-                for (const item of carritoCompras) {
-                    const idRealBaseDB = item.productoOriginalId || item.id;
-                    await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
-                }
-
+                // Si llegamos aquí, la transacción fue 100% un éxito.
                 let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
-                mensajeWa += `🧾 *Orden:* #${orderRef.id.slice(-6).toUpperCase()}\n`;
+                mensajeWa += `🧾 *Orden:* #${nuevaOrderRefID.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
                 mensajeWa += `💵 *Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
                 
@@ -846,7 +879,9 @@ function setupCheckout() {
                 }
 
             } catch (error) {
-                console.error("Error procesando pedido:", error); alert("Error al procesar. Intenta nuevamente.");
+                // Si la transacción falla (alguien compró al mismo tiempo), caemos aquí.
+                console.error("Transacción abortada:", error); 
+                alert(error.message || "Ocurrió un error al procesar tu pedido. Por favor revisa tu carrito.");
                 btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText;
             }
         });
