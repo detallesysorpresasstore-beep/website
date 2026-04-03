@@ -245,6 +245,7 @@ function setupLoginModal() {
         });
     }
 }
+
 // ==========================================
 // MÓDULO: TIENDA PÚBLICA (CATÁLOGO Y FILTROS)
 // ==========================================
@@ -896,21 +897,28 @@ function setupCheckout() {
                     nuevaOrderRefID = newOrderRef.id; 
                 });
 
-                // Si llegamos aquí, la transacción fue 100% un éxito.
-                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
-                mensajeWa += `🧾 *Orden:* #${nuevaOrderRefID.slice(-6).toUpperCase()}\n`;
-                mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
-                mensajeWa += `💵 *Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
+                // ===============================================
+                // GENERAR MENSAJE PARA WHATSAPP (Limpio y con Correo)
+                // ===============================================
+                let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web.\n\n`;
+                mensajeWa += `*Orden:* #${nuevaOrderRefID.slice(-6).toUpperCase()}\n`;
+                mensajeWa += `*Nombre:* ${orderData.clienteNombre}\n`;
+                mensajeWa += `*Correo:* ${orderData.clienteEmail}\n`;
+                mensajeWa += `*Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
                 
                 if (orderData.monedaSecundaria === 'VES' || orderData.monedaSecundaria === 'COP') {
                      const monedaSimbolo = orderData.monedaSecundaria === 'VES' ? 'Bs.' : '$ COP';
-                     mensajeWa += `🔄 *Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
+                     mensajeWa += `*Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
                 }
                 
-                if (orderData.referencia !== 'N/A') mensajeWa += `🏷️ *Referencia:* ${orderData.referencia}\n`;
-                if (orderData.comprobanteUrl) mensajeWa += `📸 *Comprobante adjunto en el sistema.*\n`;
+                if (orderData.referencia !== 'N/A') {
+                     mensajeWa += `*Referencia:* ${orderData.referencia}\n`;
+                }
+                if (orderData.comprobanteUrl) {
+                     mensajeWa += `*Comprobante adjunto en el sistema.*\n`;
+                }
                 
-                mensajeWa += `\n📍 *Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
+                mensajeWa += `\n*Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
 
                 const encodedMensaje = encodeURIComponent(mensajeWa);
                 const numeroWa = configuracionTienda.whatsapp ? configuracionTienda.whatsapp.replace(/\D/g,'') : '';
