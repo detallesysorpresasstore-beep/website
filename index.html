@@ -169,7 +169,7 @@
             <div class="flex justify-between items-center mb-4">
                 <span class="text-gray-600 font-medium">Subtotal:</span>
                 <div class="text-right">
-                    <div id="cart-total" class="text-2xl font-bold text-brand-blue">$0.00</div>
+                    <div id="cart-total" class="text-2xl font-black text-gray-800">$0.00</div>
                     <div id="cart-total-bs" class="text-sm font-medium text-gray-500">Bs. 0.00</div>
                 </div>
             </div>
@@ -239,20 +239,50 @@
             </div>
             
             <div class="p-6 overflow-y-auto no-scrollbar flex flex-col gap-6">
-                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-4">
-                    <div class="h-16 w-16 rounded-full bg-brand-blue flex items-center justify-center text-white text-3xl font-bold uppercase shadow-sm" id="perfil-avatar">
-                        U
+                <div id="perfil-vista-datos" class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="h-16 w-16 rounded-full bg-brand-blue flex items-center justify-center text-white text-3xl font-bold uppercase shadow-sm shrink-0" id="perfil-avatar">U</div>
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-lg leading-tight" id="perfil-nombre">Cargando...</h4>
+                            <p class="text-sm text-gray-600" id="perfil-email"></p>
+                            <p class="text-sm text-gray-600 mt-1 flex items-center gap-1"><i class="ph-fill ph-phone text-brand-orange"></i> <span id="perfil-telefono"></span></p>
+                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1"><i class="ph-fill ph-map-pin text-gray-400"></i> <span id="perfil-direccion"></span></p>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800 text-lg" id="perfil-nombre">Cargando...</h4>
-                        <p class="text-sm text-gray-600" id="perfil-email"></p>
-                        <p class="text-sm text-gray-600 mt-1"><i class="ph-fill ph-phone text-brand-orange"></i> <span id="perfil-telefono"></span></p>
-                    </div>
+                    <button id="btn-editar-perfil" class="w-full sm:w-auto px-4 py-2 bg-white text-brand-blue font-bold border border-blue-200 hover:bg-blue-100 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 shrink-0">
+                        <i class="ph-bold ph-pencil-simple"></i> Editar
+                    </button>
+                </div>
+
+                <div id="perfil-vista-editar" class="hidden bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <form id="form-editar-perfil" class="space-y-4">
+                        <h4 class="font-bold text-gray-700 mb-2 border-b border-gray-200 pb-2">Editar Información</h4>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Correo Electrónico (No editable)</label>
+                            <input type="email" id="edit-perfil-email" disabled class="w-full px-3 py-2 bg-gray-200 border border-gray-200 text-gray-500 rounded-lg cursor-not-allowed">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                            <input type="text" id="edit-perfil-nombre" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Teléfono de Contacto *</label>
+                            <input type="tel" id="edit-perfil-telefono" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Dirección de Envío Predeterminada</label>
+                            <textarea id="edit-perfil-direccion" rows="2" placeholder="Ingresa tu dirección para acelerar tus compras" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none"></textarea>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" id="btn-cancelar-edicion" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors">Cancelar</button>
+                            <button type="submit" id="btn-guardar-edicion" class="px-4 py-2 text-sm bg-brand-blue text-white font-bold hover:bg-blue-600 rounded-lg shadow-sm transition-colors flex items-center gap-1"><i class="ph-bold ph-floppy-disk"></i> Guardar</button>
+                        </div>
+                    </form>
                 </div>
 
                 <div>
                     <h4 class="font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3 text-sm uppercase flex items-center gap-2">
-                        <i class="ph-fill ph-shopping-bag text-brand-pink text-lg"></i> Mis Pedidos Recientes
+                        <i class="ph-fill ph-shopping-bag text-gray-800 text-lg"></i> Mis Pedidos Recientes
                     </h4>
                     <div class="bg-gray-50 rounded-xl border border-gray-200 p-2 sm:p-4 overflow-y-auto max-h-[350px] no-scrollbar">
                         <ul id="perfil-pedidos-lista" class="space-y-3">
@@ -262,7 +292,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center shrink-0">
                 <p class="text-xs text-gray-400 italic">Si necesitas ayuda, contáctanos por WhatsApp.</p>
                 <button id="btn-cerrar-sesion-perfil" class="px-4 py-2 bg-red-50 text-red-500 font-bold hover:bg-red-500 hover:text-white rounded-lg shadow-sm flex items-center gap-2 transition-colors">
                     <i class="ph-bold ph-sign-out"></i> Cerrar Sesión
@@ -294,7 +324,7 @@
                 
                 <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
                     <div class="flex flex-col">
-                        <span id="detalle-precio" class="text-4xl font-bold text-brand-blue">$0.00</span>
+                        <span id="detalle-precio" class="text-4xl font-bold text-gray-800">$0.00</span>
                         <span id="detalle-precio-bs" class="text-lg font-medium text-gray-500">Bs. 0.00</span>
                     </div>
                     <span id="detalle-stock-badge" class="text-sm font-medium text-green-500 bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max">En stock</span>
@@ -331,9 +361,9 @@
             </div>
             
             <div class="p-6 overflow-y-auto no-scrollbar">
-                <div class="mb-6 bg-orange-50 rounded-xl p-4 border border-orange-100 text-center">
+                <div class="mb-6 bg-gray-50 rounded-xl p-4 border border-gray-200 text-center">
                     <p class="text-sm text-gray-600 mb-1">Total a pagar:</p>
-                    <p id="checkout-total" class="text-3xl font-bold text-brand-orange">$0.00</p>
+                    <p id="checkout-total" class="text-3xl font-black text-gray-800">$0.00</p>
                     <p id="checkout-total-bs" class="text-lg font-medium text-gray-600">Bs. 0.00</p>
                 </div>
 
