@@ -33,7 +33,6 @@
         .category-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Animación suave para el slider de fotos */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fadeIn 0.8s ease-in-out; }
     </style>
@@ -111,7 +110,6 @@
                         </div>
                     </div>
                 </div>
-                
             </div>
         </section>
 
@@ -165,19 +163,13 @@
             </button>
         </div>
         
-        <div id="cart-items-container" class="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-            <div class="text-center text-gray-400 mt-10">
-                <i class="ph-duotone ph-shopping-bag text-6xl mb-3 text-gray-300"></i>
-                <p>Tu carrito está vacío</p>
-                <button id="btn-seguir-vacio" class="mt-4 text-brand-blue font-bold hover:underline">Ir a comprar</button>
-            </div>
-        </div>
+        <div id="cart-items-container" class="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar"></div>
         
         <div class="border-t border-gray-200 p-6 bg-gray-50">
             <div class="flex justify-between items-center mb-4">
                 <span class="text-gray-600 font-medium">Subtotal:</span>
                 <div class="text-right">
-                    <div id="cart-total" class="text-2xl font-bold text-brand-pink">$0.00</div>
+                    <div id="cart-total" class="text-2xl font-bold text-brand-blue">$0.00</div>
                     <div id="cart-total-bs" class="text-sm font-medium text-gray-500">Bs. 0.00</div>
                 </div>
             </div>
@@ -203,7 +195,6 @@
                     <i class="ph-fill ph-warning-circle text-2xl mb-1 block mx-auto"></i>
                     Para proceder al pago vamos a registrar tu cuenta o inicia sesión. <br>¡Es un proceso rápido y seguro!
                 </p>
-                
                 <form id="form-login" class="space-y-4">
                     <div id="div-nombre" class="hidden">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
@@ -259,7 +250,7 @@
                 
                 <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
                     <div class="flex flex-col">
-                        <span id="detalle-precio" class="text-4xl font-bold text-brand-pink">$0.00</span>
+                        <span id="detalle-precio" class="text-4xl font-bold text-brand-blue">$0.00</span>
                         <span id="detalle-precio-bs" class="text-lg font-medium text-gray-500">Bs. 0.00</span>
                     </div>
                     <span id="detalle-stock-badge" class="text-sm font-medium text-green-500 bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max">En stock</span>
