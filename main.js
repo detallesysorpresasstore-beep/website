@@ -4,8 +4,8 @@
 
 import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-// Añadimos runTransaction para el escudo de inventario infalible
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+// Importamos query y where para poder buscar los pedidos específicos del usuario
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 
@@ -108,7 +108,7 @@ function monitorAuthState() {
         if (user) {
             if (btnLoginIcon) { btnLoginIcon.classList.remove('ph'); btnLoginIcon.classList.add('text-brand-orange', 'ph-fill'); }
             if(btnLoginMovil) btnLoginMovil.textContent = "Mi Perfil";
-            // CORRECCIÓN: Ruta limpia de usuarios
+            
             const userDoc = await getDoc(doc(db, "users", user.uid));
             if(userDoc.exists()) currentUserData = userDoc.data();
         } else {
@@ -126,13 +126,22 @@ function setupLoginModal() {
     const btnCerrar = document.getElementById('btn-cerrar-login');
     const form = document.getElementById('form-login');
     const btnToggle = document.getElementById('btn-toggle-mode');
+    
+    // Controles del Nuevo Perfil
+    const modalPerfil = document.getElementById('modal-perfil');
+    const btnCerrarPerfil = document.getElementById('btn-cerrar-perfil');
+    const btnCerrarSesionPerfil = document.getElementById('btn-cerrar-sesion-perfil');
     let isLoginMode = true;
 
     const abrirModal = async () => {
         if(currentUser) {
-            const conf = confirm("Ya tienes una sesión iniciada. ¿Deseas cerrar sesión?");
-            if(conf) { await signOut(auth); window.location.reload(); } 
-            else { if(currentUserData && currentUserData.role === 'admin') window.location.href = 'admin.html'; }
+            if(currentUserData && currentUserData.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else {
+                // MAGIA: Abrimos el perfil del cliente en lugar de preguntar si quiere cerrar sesión
+                modalPerfil.classList.remove('hidden');
+                cargarPerfilUsuario();
+            }
             return;
         }
         document.getElementById('login-mensaje-checkout').classList.add('hidden'); 
@@ -142,13 +151,23 @@ function setupLoginModal() {
     if(btnAbrir) btnAbrir.addEventListener('click', abrirModal);
     if(btnAbrirMovil) btnAbrirMovil.addEventListener('click', abrirModal);
     
-    // CORRECCIÓN: Limpiar el aviso si el usuario cancela y cierra la ventana
     if(btnCerrar) { 
         btnCerrar.addEventListener('click', () => { 
             modal.classList.add('hidden'); 
             form.reset(); 
             document.getElementById('login-mensaje-checkout').classList.add('hidden');
         }); 
+    }
+
+    // Lógica para cerrar la ventana del perfil y cerrar sesión
+    if(btnCerrarPerfil) btnCerrarPerfil.addEventListener('click', () => modalPerfil.classList.add('hidden'));
+    if(btnCerrarSesionPerfil) {
+        btnCerrarSesionPerfil.addEventListener('click', async () => {
+            if(confirm("¿Seguro que deseas cerrar tu sesión?")) {
+                await signOut(auth);
+                window.location.reload();
+            }
+        });
     }
 
     if (btnToggle) {
@@ -199,25 +218,21 @@ function setupLoginModal() {
                     loginSuccess.classList.remove('hidden');
                 }
 
-                // Cargar datos globalmente al instante
                 const userDoc = await getDoc(doc(db, "users", uid));
                 if(userDoc.exists()) currentUserData = userDoc.data();
                 currentUser = auth.currentUser;
 
-                // Redirigir al panel si es administrador
                 if(currentUserData && currentUserData.role === 'admin') {
                     setTimeout(() => { window.location.href = 'admin.html'; }, 1000);
                     return; 
                 }
 
-                // MAGIA: ¿El cliente venía del proceso de pago?
                 const vieneDelCheckout = !document.getElementById('login-mensaje-checkout').classList.contains('hidden');
 
                 setTimeout(() => {
-                    modal.classList.add('hidden'); // Ocultar el modal de registro
+                    modal.classList.add('hidden'); 
                     
                     if (vieneDelCheckout) {
-                        // Pasar directamente a la pantalla de Pago sin recargar
                         const selectMetodo = document.getElementById('checkout-metodo');
                         selectMetodo.innerHTML = '<option value="">Selecciona cómo vas a pagar...</option>';
                         metodosPagoPublicos.forEach(m => { selectMetodo.innerHTML += `<option value="${m.id}">${m.nombre}</option>`; });
@@ -231,7 +246,6 @@ function setupLoginModal() {
                         
                         document.getElementById('modal-checkout').classList.remove('hidden');
                     } else {
-                        // Si entró a la cuenta desde el botón normal del menú, refrescamos
                         window.location.reload(); 
                     }
                 }, 1000);
@@ -247,6 +261,84 @@ function setupLoginModal() {
 }
 
 // ==========================================
+// NUEVO: CARGAR PERFIL Y PEDIDOS DEL CLIENTE
+// ==========================================
+window.cargarPerfilUsuario = async () => {
+    if(!currentUser) return;
+    
+    // Llenar datos personales
+    document.getElementById('perfil-nombre').textContent = currentUserData?.name || 'Cliente de Detalles y Sorpresas';
+    document.getElementById('perfil-email').textContent = currentUser.email;
+    document.getElementById('perfil-telefono').textContent = currentUserData?.phone || 'Sin teléfono registrado';
+    
+    let inicial = (currentUserData?.name || 'U').charAt(0).toUpperCase();
+    document.getElementById('perfil-avatar').textContent = inicial;
+
+    // Buscar historial de compras
+    const lista = document.getElementById('perfil-pedidos-lista');
+    lista.innerHTML = '<li class="text-center text-brand-blue py-6"><i class="ph-duotone ph-spinner animate-spin text-4xl mb-2"></i><p class="text-sm font-bold">Buscando tus pedidos...</p></li>';
+
+    try {
+        const q = query(collection(db, "orders"), where("clienteId", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        
+        let pedidos = [];
+        querySnapshot.forEach(doc => {
+            let p = doc.data(); p.id = doc.id;
+            pedidos.push(p);
+        });
+
+        if(pedidos.length === 0) {
+            lista.innerHTML = '<li class="text-center text-gray-400 py-6"><i class="ph-duotone ph-receipt text-4xl mb-2 text-gray-300"></i><p>Aún no tienes pedidos registrados.</p></li>';
+            return;
+        }
+
+        // Ordenar del más reciente al más antiguo
+        pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        let htmlTemporal = '';
+        pedidos.forEach(pedido => {
+            let colorEstado = 'bg-gray-100 text-gray-600';
+            if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700 border-yellow-200'; 
+            if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700 border-blue-200'; 
+            if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700 border-indigo-200'; 
+            if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700 border-green-200'; 
+            if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700 border-red-200';
+
+            let fechaF = 'N/A';
+            if(pedido.fecha) {
+                fechaF = new Date(pedido.fecha).toLocaleDateString('es-VE', {day:'2-digit', month:'short', year:'numeric'});
+            }
+
+            let cantItems = 0;
+            if(pedido.productos) pedido.productos.forEach(p => cantItems += p.cantidad);
+
+            htmlTemporal += `
+                <li class="bg-white p-3 sm:p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-brand-blue transition-colors">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-bold text-gray-800 text-sm">Orden #${pedido.id.slice(-6).toUpperCase()}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorEstado}">${pedido.estado}</span>
+                        </div>
+                        <p class="text-xs text-gray-500"><i class="ph-fill ph-calendar-blank text-gray-400"></i> ${fechaF} <span class="mx-1">•</span> <i class="ph-fill ph-package text-gray-400"></i> ${cantItems} producto(s)</p>
+                    </div>
+                    <div class="text-left sm:text-right">
+                        <p class="font-black text-brand-pink text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${pedido.metodoPago}</p>
+                    </div>
+                </li>
+            `;
+        });
+
+        lista.innerHTML = htmlTemporal;
+
+    } catch (error) {
+        console.error("Error cargando historial:", error);
+        lista.innerHTML = '<li class="text-center text-red-500 py-6"><i class="ph-fill ph-warning-circle text-4xl mb-2"></i><p>Ocurrió un error al buscar tus pedidos.</p></li>';
+    }
+};
+
+// ==========================================
 // MÓDULO: TIENDA PÚBLICA (CATÁLOGO Y FILTROS)
 // ==========================================
 
@@ -257,7 +349,6 @@ async function cargarCategoriasPublicas() {
         const querySnapshot = await getDocs(collection(db, "categories"));
         if (querySnapshot.empty) { contenedor.innerHTML = '<p class="col-span-full text-center text-gray-500">Próximamente nuevas categorías.</p>'; return; }
         
-        // MEJORA: Construir HTML en memoria
         let htmlTemporal = '';
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
@@ -291,7 +382,6 @@ function renderizarCatalogo(productosAMostrar) {
         return;
     }
 
-    // MEJORA: Construir HTML en memoria para evitar tirones (lag) en celulares
     let htmlTemporal = '';
     productosAMostrar.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
@@ -505,7 +595,6 @@ function setupModalDetalle() {
         if(prod.imagenes && prod.imagenes.length > 0 && prod.imagenes[0].startsWith('http')) {
             imgPrincipal.src = prod.imagenes[0];
             if(prod.imagenes.length > 1) {
-                // MEJORA DOM: HTML Temporal
                 let mHtml = '';
                 prod.imagenes.forEach((url, index) => {
                     const borderClass = index === 0 ? 'border-brand-blue' : 'border-transparent';
@@ -632,7 +721,6 @@ function renderizarCarrito() {
         return;
     }
 
-    // MEJORA DOM: HTML Temporal
     let htmlTemporal = '';
     
     carritoCompras.forEach(item => {
@@ -820,9 +908,6 @@ function setupCheckout() {
     if(btnCerrarCheckout) btnCerrarCheckout.addEventListener('click', cerrarCheckout);
     if(btnCancelarCheckout) btnCancelarCheckout.addEventListener('click', cerrarCheckout);
 
-    // ==========================================
-    // ESCUDO DE INVENTARIO INFALIBLE CON TRANSACCIONES
-    // ==========================================
     if(btnConfirmar) {
         btnConfirmar.addEventListener('click', async () => {
             if(!formCheckout.checkValidity()) { formCheckout.reportValidity(); return; }
@@ -860,11 +945,9 @@ function setupCheckout() {
             let nuevaOrderRefID = '';
 
             try {
-                // TRANSACCIÓN DE FIRESTORE: Lee todos los stocks, y si están bien, descuenta y crea la orden al mismo tiempo.
                 await runTransaction(db, async (transaction) => {
                     let productosActualizar = [];
 
-                    // 1. Fase de Lectura (VITAL: En Firebase las lecturas van primero)
                     for (const item of carritoCompras) {
                         const idRealBaseDB = item.productoOriginalId || item.id;
                         const prodRef = doc(db, "products", idRealBaseDB);
@@ -879,27 +962,21 @@ function setupCheckout() {
                             throw new Error(`¡Uy! Alguien más acaba de llevarse el último "${item.nombre}". Solo quedan ${stockActual} unidades.`);
                         }
 
-                        // Guardamos la referencia y el nuevo stock para la fase de escritura
                         productosActualizar.push({
                             ref: prodRef,
                             nuevoStock: stockActual - item.cantidad
                         });
                     }
 
-                    // 2. Fase de Escritura (Solo se ejecuta si TODO el stock anterior estaba correcto)
                     for (const prod of productosActualizar) {
                         transaction.update(prod.ref, { stock: prod.nuevoStock });
                     }
 
-                    // 3. Crear la Orden en la misma transacción
-                    const newOrderRef = doc(collection(db, "orders")); // Crea una referencia con ID nuevo
+                    const newOrderRef = doc(collection(db, "orders")); 
                     transaction.set(newOrderRef, orderData);
                     nuevaOrderRefID = newOrderRef.id; 
                 });
 
-                // ===============================================
-                // GENERAR MENSAJE PARA WHATSAPP (Limpio y con Correo)
-                // ===============================================
                 let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web.\n\n`;
                 mensajeWa += `*Orden:* #${nuevaOrderRefID.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `*Nombre:* ${orderData.clienteNombre}\n`;
@@ -934,7 +1011,6 @@ function setupCheckout() {
                 }
 
             } catch (error) {
-                // Si la transacción falla (alguien compró al mismo tiempo), caemos aquí.
                 console.error("Transacción abortada:", error); 
                 alert(error.message || "Ocurrió un error al procesar tu pedido. Por favor revisa tu carrito.");
                 btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText;
