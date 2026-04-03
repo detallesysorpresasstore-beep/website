@@ -33,7 +33,6 @@
         * { -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Scrollbar sutil para la caja de íconos */
         .icon-scroll::-webkit-scrollbar { width: 6px; }
         .icon-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
         .icon-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -184,7 +183,7 @@
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                     <div class="flex items-center gap-3">
                         <h2 class="text-xl font-bold text-gray-700 hidden sm:block">Órdenes Recientes</h2>
-                        <button id="btn-abrir-limpieza" class="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 border border-red-100 shadow-sm">
+                        <button onclick="abrirModalLimpieza()" class="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1 border border-red-100 shadow-sm">
                             <i class="ph-bold ph-trash"></i> Limpiar Historial
                         </button>
                     </div>
@@ -532,7 +531,7 @@
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
                     <button id="btn-cancelar-modal-ped" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cerrar</button>
-                    <button id="btn-guardar-pedido" type="button" class="px-5 py-2 bg-brand-blue text-white font-bold hover:bg-blue-600 rounded-lg shadow-sm flex items-center gap-2">
+                    <button id="btn-guardar-pedido" type="button" onclick="actualizarEstadoPedido()" class="px-5 py-2 bg-brand-blue text-white font-bold hover:bg-blue-600 rounded-lg shadow-sm flex items-center gap-2">
                         <i class="ph-bold ph-floppy-disk"></i> Guardar Cambios
                     </button>
                 </div>
@@ -659,7 +658,7 @@
             <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
                 <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-red-50">
                     <h3 class="text-lg font-bold text-red-600 flex items-center gap-2"><i class="ph-fill ph-warning-circle text-2xl"></i> Limpiar Historial</h3>
-                    <button id="btn-cerrar-modal-limpiar" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
+                    <button onclick="cerrarModalLimpieza()" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
                 </div>
                 <div class="p-6">
                     <p class="text-sm text-gray-600 mb-4">Selecciona una fecha límite. Se eliminarán permanentemente todos los pedidos registrados en esa fecha y anteriores.</p>
@@ -669,8 +668,8 @@
                     </div>
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-                    <button id="btn-cancelar-modal-limpiar" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
-                    <button id="btn-confirmar-limpieza" type="button" class="px-5 py-2 bg-red-500 text-white font-bold hover:bg-red-600 rounded-lg shadow-sm">Eliminar Pedidos</button>
+                    <button onclick="cerrarModalLimpieza()" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
+                    <button id="btn-confirmar-limpieza" type="button" onclick="ejecutarLimpiezaHistorial()" class="px-5 py-2 bg-red-500 text-white font-bold hover:bg-red-600 rounded-lg shadow-sm">Eliminar Pedidos</button>
                 </div>
             </div>
         </div>
@@ -729,15 +728,12 @@
             if (iconBtns.length > 0) {
                 iconBtns.forEach(btn => {
                     btn.addEventListener('click', () => {
-                        // Resetear todos
                         iconBtns.forEach(b => { 
                             b.classList.remove('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); 
                             b.classList.add('border-gray-200', 'bg-gray-50', 'text-gray-500'); 
                         });
-                        // Marcar el activo
                         btn.classList.remove('border-gray-200', 'bg-gray-50', 'text-gray-500'); 
                         btn.classList.add('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); 
-                        // Actualizar valor oculto
                         inputIcono.value = btn.getAttribute('data-icon');
                     });
                 });
