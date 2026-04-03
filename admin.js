@@ -56,11 +56,11 @@ const promoOfertaCategoria = document.getElementById('promo-oferta-categoria');
 const promoOfertaSubcategoria = document.getElementById('promo-oferta-subcategoria');
 const promoOfertaProducto = document.getElementById('promo-oferta-producto');
 
-// Colecciones en Firestore
+// Colecciones en Firestore (CORRECCIÓN: Rutas limpias)
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
-const usersCollection = collection(db, "artifacts/detalles-y-sorpresas-store/public/data/users");
+const usersCollection = collection(db, "users"); // RUTA CORREGIDA
 const paymentsCollection = collection(db, "payment_methods"); 
 const promosCollection = collection(db, "promotions"); 
 const configDocRef = doc(db, "config", "store_settings");
@@ -281,9 +281,10 @@ async function cargarPagos() {
     const tbody = document.getElementById('admin-payments-list');
     try {
         const querySnapshot = await getDocs(paymentsCollection);
-        tbody.innerHTML = ''; pagosGlobales = [];
+        pagosGlobales = [];
         if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No hay métodos de pago configurados.</td></tr>'; return; }
         
+        let htmlTemporal = '';
         querySnapshot.forEach((docSnap) => {
             const p = docSnap.data(); p.id = docSnap.id;
             pagosGlobales.push(p);
@@ -292,7 +293,7 @@ async function cargarPagos() {
                 ? `<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">${p.descuento}% Dscto</span>` 
                 : `<span class="text-gray-400 text-sm">Sin dscto</span>`;
 
-            tbody.innerHTML += `
+            htmlTemporal += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${p.nombre}</td>
                     <td class="p-4"><span class="bg-blue-50 text-brand-blue border border-blue-200 px-2 py-1 rounded text-xs font-bold">${p.moneda}</span></td>
@@ -304,6 +305,7 @@ async function cargarPagos() {
                 </tr>
             `;
         });
+        tbody.innerHTML = htmlTemporal;
     } catch (error) { console.error("Error cargando pagos:", error); }
 }
 
@@ -411,9 +413,10 @@ async function cargarPromociones() {
     
     try {
         const querySnapshot = await getDocs(promosCollection);
-        tbody.innerHTML = ''; promosGlobales = [];
+        promosGlobales = [];
         if (querySnapshot.empty) { tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No hay promociones activas. Crea la primera.</td></tr>'; return; }
         
+        let htmlTemporal = '';
         querySnapshot.forEach((docSnap) => {
             const p = docSnap.data(); p.id = docSnap.id;
             promosGlobales.push(p);
@@ -427,7 +430,7 @@ async function cargarPromociones() {
                 ? `<span class="text-brand-pink font-bold">${p.porcentajeDescuento}% off</span> en ${prodOfrecido.nombre}` 
                 : '<span class="text-red-500">Producto no encontrado</span>';
 
-            tbody.innerHTML += `
+            htmlTemporal += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="p-4 font-medium text-gray-800">${p.nombre}</td>
                     <td class="p-4 text-sm text-gray-600">${condicionText}</td>
@@ -439,6 +442,7 @@ async function cargarPromociones() {
                 </tr>
             `;
         });
+        tbody.innerHTML = htmlTemporal;
     } catch (error) { console.error("Error cargando promociones:", error); }
 }
 
@@ -520,12 +524,15 @@ function aplicarFiltrosCategorias() {
 }
 
 function dibujarTablaCategorias(arreglo) {
-    const tbody = document.getElementById('admin-categories-list'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-categories-list'); 
     if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">No se encontraron categorías.</td></tr>'; return; }
+    
+    let htmlTemporal = '';
     arreglo.forEach(cat => {
         const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) ? cat.subcategorias.map(s => `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-xs mr-1 mb-1">${s}</span>`).join('') : '<span class="text-gray-400 italic">Sin subcategorías</span>';
-        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${cat.nombre}</td><td class="p-4 text-gray-600">${subcatsTexto}</td><td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td><td class="p-4 text-center"><button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${cat.nombre}</td><td class="p-4 text-gray-600">${subcatsTexto}</td><td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td><td class="p-4 text-center"><button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
+    tbody.innerHTML = htmlTemporal;
 }
 
 async function guardarCategoria() {
@@ -586,8 +593,10 @@ async function manejarSubidaMultiplesImagenes(event) {
 }
 
 function renderizarGaleria() {
-    const galeria = document.getElementById('galeria-preview'); galeria.innerHTML = '';
-    arrayImagenesUrls.forEach((url, index) => { galeria.innerHTML += `<div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square"><img src="${url}" class="w-full h-full object-cover"><button type="button" onclick="quitarImagen(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-x text-xs"></i></button></div>`; });
+    const galeria = document.getElementById('galeria-preview'); 
+    let htmlTemporal = '';
+    arrayImagenesUrls.forEach((url, index) => { htmlTemporal += `<div class="relative group rounded-lg overflow-hidden border border-gray-200 aspect-square"><img src="${url}" class="w-full h-full object-cover"><button type="button" onclick="quitarImagen(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-x text-xs"></i></button></div>`; });
+    galeria.innerHTML = htmlTemporal;
 }
 window.quitarImagen = (index) => { arrayImagenesUrls.splice(index, 1); renderizarGaleria(); };
 
@@ -620,14 +629,17 @@ function aplicarFiltrosProductos() {
 }
 
 function dibujarTablaProductos(arreglo) {
-    const tbody = document.getElementById('admin-products-list'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-products-list'); 
     if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron productos.</td></tr>'; return; }
+    
+    let htmlTemporal = '';
     arreglo.forEach(prod => {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
         let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
         const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
-        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
+    tbody.innerHTML = htmlTemporal;
 }
 
 function resetearModalProducto(titulo) {
@@ -663,14 +675,17 @@ function aplicarFiltrosClientes() {
 }
 
 function dibujarTablaClientes(arreglo) {
-    const tbody = document.getElementById('admin-clients-list'); tbody.innerHTML = '';
+    const tbody = document.getElementById('admin-clients-list'); 
     if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron clientes.</td></tr>'; return; }
+    
+    let htmlTemporal = '';
     arreglo.forEach((user) => {
         const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
         const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
         const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
     });
+    tbody.innerHTML = htmlTemporal;
 }
 
 function exportarClientesExcel() {
@@ -678,10 +693,6 @@ function exportarClientesExcel() {
     const datosLimpios = clientesFiltrados.map(c => ({ "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A', "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente', "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A' }));
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
-
-// ==========================================
-// MÓDULO: PEDIDOS
-// ==========================================
 
 async function cargarPedidos() {
     try { const querySnapshot = await getDocs(ordersCollection); pedidosGlobales = []; querySnapshot.forEach((docSnap) => { const pedido = docSnap.data(); pedido.id = docSnap.id; pedidosGlobales.push(pedido); }); aplicarFiltrosPedidos(); } catch (error) { console.error(error); }
@@ -694,12 +705,12 @@ function aplicarFiltrosPedidos() {
 }
 
 function dibujarTablaPedidos(arreglo) {
-    const tbody = document.getElementById('admin-orders-list'); tbody.innerHTML = '';
-    // Ajustado colspan a 6 para incluir la columna de Fecha
+    const tbody = document.getElementById('admin-orders-list'); 
     if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500">No se encontraron pedidos.</td></tr>'; return; }
     
     arreglo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     
+    let htmlTemporal = '';
     arreglo.forEach((pedido) => {
         let colorEstado = 'bg-gray-100 text-gray-600';
         if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700'; 
@@ -708,30 +719,23 @@ function dibujarTablaPedidos(arreglo) {
         if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700'; 
         if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
 
-        // Formatear Fecha
         let fechaFormateada = 'N/A';
         if (pedido.fecha) {
             const fechaObj = new Date(pedido.fecha);
-            fechaFormateada = fechaObj.toLocaleDateString('es-VE', { 
-                day: '2-digit', month: 'short', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
-            });
+            fechaFormateada = fechaObj.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
-        tbody.innerHTML += `
+        htmlTemporal += `
         <tr class="border-b border-gray-100 hover:bg-gray-50">
             <td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td>
             <td class="p-4 text-sm text-gray-600 font-medium">${fechaFormateada}</td>
             <td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td>
             <td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td>
             <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td>
-            <td class="p-4 text-center">
-                <button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">
-                    Ver / Editar
-                </button>
-            </td>
+            <td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td>
         </tr>`;
     });
+    tbody.innerHTML = htmlTemporal;
 }
 
 window.abrirModalPedido = (id) => { 
@@ -765,11 +769,12 @@ window.abrirModalPedido = (id) => {
     }
 
     const listaProd = document.getElementById('ped-productos-lista');
-    listaProd.innerHTML = '';
+    
     if (pedido.productos && pedido.productos.length > 0) {
+        let htmlTemporal = '';
         pedido.productos.forEach(prod => {
             const img = prod.imagen || 'https://via.placeholder.com/50';
-            listaProd.innerHTML += `
+            htmlTemporal += `
                 <li class="flex items-center gap-3 bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
                     <img src="${img}" class="w-12 h-12 rounded object-cover border border-gray-200">
                     <div class="flex-1">
@@ -782,6 +787,7 @@ window.abrirModalPedido = (id) => {
                 </li>
             `;
         });
+        listaProd.innerHTML = htmlTemporal;
     } else {
         listaProd.innerHTML = '<li class="text-sm text-gray-500 italic text-center py-4">No hay productos en esta orden.</li>';
     }
