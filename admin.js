@@ -35,7 +35,6 @@ const selectSubcatParent = document.getElementById('subcat-parent');
 
 // Pedidos y Clientes
 const modalPedido = document.getElementById('modal-pedido');
-const btnGuardarPedido = document.getElementById('btn-guardar-pedido');
 const filtroFechaPedidos = document.getElementById('filtro-fecha-pedidos'); 
 const filtroEstadoPedidos = document.getElementById('filtro-estado-pedidos'); 
 const btnExportarClientes = document.getElementById('btn-exportar-clientes');
@@ -137,9 +136,9 @@ function configurarEventos() {
 
     document.getElementById('btn-cerrar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
-    btnGuardarPedido.addEventListener('click', actualizarEstadoPedido);
     if (filtroFechaPedidos) filtroFechaPedidos.addEventListener('change', aplicarFiltrosPedidos);
     if (filtroEstadoPedidos) filtroEstadoPedidos.addEventListener('change', aplicarFiltrosPedidos);
+    
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
     if (buscadorClientes) buscadorClientes.addEventListener('input', aplicarFiltrosClientes);
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
@@ -187,6 +186,61 @@ function configurarEventos() {
 }
 
 // ==========================================
+// NUEVO: FUNCIONES DIRECTAS PARA LIMPIAR HISTORIAL
+// ==========================================
+
+window.abrirModalLimpieza = () => {
+    document.getElementById('input-fecha-limpieza').value = '';
+    document.getElementById('modal-limpiar-pedidos').classList.remove('hidden');
+};
+
+window.cerrarModalLimpieza = () => {
+    document.getElementById('modal-limpiar-pedidos').classList.add('hidden');
+};
+
+window.ejecutarLimpiezaHistorial = async () => {
+    const inputFecha = document.getElementById('input-fecha-limpieza');
+    const btnConfirmar = document.getElementById('btn-confirmar-limpieza');
+    const modalLimpiar = document.getElementById('modal-limpiar-pedidos');
+    
+    const fechaLimite = inputFecha.value;
+    if (!fechaLimite) return alert("Por favor selecciona una fecha límite.");
+
+    const pedidosAEliminar = pedidosGlobales.filter(p => {
+        if (!p.fecha) return false;
+        const fechaPedido = p.fecha.split('T')[0]; // Extrae formato "YYYY-MM-DD"
+        return fechaPedido <= fechaLimite;
+    });
+
+    if (pedidosAEliminar.length === 0) {
+        return alert("No se encontraron pedidos registrados en esa fecha o anteriores.");
+    }
+
+    if (!confirm(`⚠️ ADVERTENCIA: Estás a punto de eliminar permanentemente ${pedidosAEliminar.length} pedido(s). Esta acción NO se puede deshacer. ¿Deseas continuar?`)) {
+        return;
+    }
+
+    const originalText = btnConfirmar.innerHTML;
+    btnConfirmar.disabled = true;
+    btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Eliminando...';
+
+    try {
+        for (const pedido of pedidosAEliminar) {
+            await deleteDoc(doc(db, "orders", pedido.id));
+        }
+        alert(`✅ Se eliminaron ${pedidosAEliminar.length} pedidos del historial de forma exitosa.`);
+        modalLimpiar.classList.add('hidden');
+        cargarPedidos(); // Refresca la tabla en pantalla
+    } catch (error) {
+        console.error("Error al limpiar historial:", error);
+        alert("Ocurrió un error durante la limpieza del historial.");
+    } finally {
+        btnConfirmar.disabled = false;
+        btnConfirmar.innerHTML = "Eliminar Pedidos";
+    }
+};
+
+// ==========================================
 // MÓDULO: TASAS Y MÉTODOS DE PAGO
 // ==========================================
 
@@ -197,11 +251,11 @@ async function cargarTasas() {
             const data = docSnap.data();
             const inputTasaBcv = document.getElementById('config-tasa-bcv');
             const inputTasaCop = document.getElementById('config-tasa-cop');
-            const inputWhatsapp = document.getElementById('config-whatsapp'); // NUEVO
+            const inputWhatsapp = document.getElementById('config-whatsapp'); 
             
             if (inputTasaBcv) inputTasaBcv.value = data.tasaBcv || '';
             if (inputTasaCop) inputTasaCop.value = data.tasaCop || '';
-            if (inputWhatsapp) inputWhatsapp.value = data.whatsapp || ''; // NUEVO
+            if (inputWhatsapp) inputWhatsapp.value = data.whatsapp || ''; 
         }
     } catch (error) { console.error("Error cargando tasas:", error); }
 }
@@ -213,10 +267,9 @@ async function guardarTasas() {
 
     const tasaBcv = parseFloat(document.getElementById('config-tasa-bcv').value) || 0;
     const tasaCop = parseFloat(document.getElementById('config-tasa-cop').value) || 0;
-    const whatsapp = document.getElementById('config-whatsapp').value.trim(); // NUEVO
+    const whatsapp = document.getElementById('config-whatsapp').value.trim(); 
 
     try {
-        // ACTUALIZADO: Guarda también el número de WhatsApp
         await setDoc(configDocRef, { tasaBcv, tasaCop, whatsapp, fechaActualizacion: new Date().toISOString() }, { merge: true });
         alert("Configuración actualizada con éxito.");
     } catch (error) {
@@ -482,7 +535,7 @@ async function guardarCategoria() {
     const nombre = document.getElementById('cat-nombre').value.trim(); const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
     if (!nombre) return alert("El nombre es obligatorio.");
     btnGuardarCategoria.disabled = true; btnGuardarCategoria.innerText = "Guardando...";
-    try { await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] }); modalCategoria.classList.add('hidden'); await cargarCategorias(); } 
+    try { await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] }); document.getElementById('modal-categoria').classList.add('hidden'); await cargarCategorias(); } 
     catch (error) { alert("Hubo un error."); } finally { btnGuardarCategoria.disabled = false; btnGuardarCategoria.innerText = "Guardar"; }
 }
 
@@ -495,7 +548,7 @@ async function guardarSubcategoria() {
         const nuevasSubcategorias = [...(categoriaPadre.subcategorias || [])];
         const existe = nuevasSubcategorias.find(s => s.toLowerCase() === subName.toLowerCase());
         if (!existe) { nuevasSubcategorias.push(subName); await updateDoc(doc(db, "categories", parentId), { subcategorias: nuevasSubcategorias }); } else { alert("Esta subcategoría ya existe en esta categoría."); }
-        modalSubcategoria.classList.add('hidden'); await cargarCategorias(); 
+        document.getElementById('modal-subcategoria').classList.add('hidden'); await cargarCategorias(); 
     } catch (error) { alert("Hubo un error al guardar."); } finally { btnGuardarSubcategoria.disabled = false; btnGuardarSubcategoria.innerText = "Guardar Subcategoría"; }
 }
 
@@ -629,6 +682,10 @@ function exportarClientesExcel() {
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
 
+// ==========================================
+// MÓDULO: PEDIDOS Y LIMPIEZA DE HISTORIAL
+// ==========================================
+
 async function cargarPedidos() {
     try { const querySnapshot = await getDocs(ordersCollection); pedidosGlobales = []; querySnapshot.forEach((docSnap) => { const pedido = docSnap.data(); pedido.id = docSnap.id; pedidosGlobales.push(pedido); }); aplicarFiltrosPedidos(); } catch (error) { console.error(error); }
 }
@@ -665,7 +722,6 @@ window.abrirModalPedido = (id) => {
     document.getElementById('ped-pago-metodo').textContent = pedido.metodoPago || 'No especificado';
     document.getElementById('ped-pago-referencia').textContent = pedido.referencia || 'N/A';
 
-    // LÓGICA DE FOTO INTEGRADA
     const contComprobante = document.getElementById('ped-contenedor-comprobante');
     const imgComprobante = document.getElementById('ped-img-comprobante');
     const enlaceComprobante = document.getElementById('ped-enlace-comprobante');
@@ -714,31 +770,29 @@ window.abrirModalPedido = (id) => {
     }
     document.getElementById('ped-total-secundario').textContent = textoSecundario;
 
-    modalPedido.classList.remove('hidden'); 
+    document.getElementById('modal-pedido').classList.remove('hidden'); 
 };
 
-async function actualizarEstadoPedido() {
+window.actualizarEstadoPedido = async () => {
     const id = document.getElementById('ped-id').value; 
     const nuevoEstado = document.getElementById('ped-estado').value; 
-    btnGuardarPedido.disabled = true; 
-    btnGuardarPedido.innerText = "Guardando...";
+    const btnGuardar = document.getElementById('btn-guardar-pedido');
+    btnGuardar.disabled = true; 
+    btnGuardar.innerText = "Guardando...";
 
     try { 
-        // 1. Buscamos el pedido en la base de datos para saber qué productos tiene
         const orderRef = doc(db, "orders", id);
         const orderSnap = await getDoc(orderRef);
         
         if (orderSnap.exists()) {
             const orderData = orderSnap.data();
             
-            // LÓGICA DE STOCK: Si cancelamos el pedido (y no estaba cancelado antes) -> Devolvemos el stock
             if (nuevoEstado === 'Cancelado' && orderData.estado !== 'Cancelado') {
                 for (const item of orderData.productos) {
                     const idReal = item.productoOriginalId || item.id;
                     await updateDoc(doc(db, "products", idReal), { stock: increment(item.cantidad) });
                 }
             } 
-            // LÓGICA DE STOCK: Si lo habíamos cancelado por error y lo RESTAURAMOS -> Volvemos a descontarlo
             else if (orderData.estado === 'Cancelado' && nuevoEstado !== 'Cancelado') {
                 for (const item of orderData.productos) {
                     const idReal = item.productoOriginalId || item.id;
@@ -747,18 +801,16 @@ async function actualizarEstadoPedido() {
             }
         }
 
-        // 2. Actualizamos el estado de la orden
         await updateDoc(orderRef, { estado: nuevoEstado }); 
-        
-        modalPedido.classList.add('hidden'); 
+        document.getElementById('modal-pedido').classList.add('hidden'); 
         cargarPedidos(); 
-        cargarProductos(); // Refrescamos la tabla de productos por si el stock cambió
+        cargarProductos(); 
         
     } catch (error) { 
         alert("Error al actualizar el estado del pedido."); 
         console.error(error); 
     } finally { 
-        btnGuardarPedido.disabled = false; 
-        btnGuardarPedido.innerHTML = `<i class="ph-bold ph-floppy-disk"></i> Guardar Cambios`; 
+        btnGuardar.disabled = false; 
+        btnGuardar.innerHTML = `<i class="ph-bold ph-floppy-disk"></i> Guardar Cambios`; 
     }
-}
+};
