@@ -1,10 +1,9 @@
 /**
- * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública)
+ * Detalles y Sorpresas STORE - Archivo Principal JS
  */
 
 import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-// Importamos query y where para poder buscar los pedidos específicos del usuario
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
@@ -27,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
     setupMobileMenu();
     setupLoginModal();
+    setupPerfilEdicion(); // NUEVO: Configura la edición de perfil
     monitorAuthState();
     setupLightbox(); 
     
@@ -109,8 +109,17 @@ function monitorAuthState() {
             if (btnLoginIcon) { btnLoginIcon.classList.remove('ph'); btnLoginIcon.classList.add('text-brand-orange', 'ph-fill'); }
             if(btnLoginMovil) btnLoginMovil.textContent = "Mi Perfil";
             
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-            if(userDoc.exists()) currentUserData = userDoc.data();
+            try {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if(userDoc.exists()) {
+                    currentUserData = userDoc.data();
+                    if(currentUserData.role === 'admin' && !window.location.href.includes('admin.html')) {
+                        window.location.href = 'admin.html';
+                    }
+                }
+            } catch (err) {
+                console.warn("No se pudieron cargar los datos del perfil:", err);
+            }
         } else {
             currentUserData = null;
             if (btnLoginIcon) { btnLoginIcon.classList.remove('text-brand-orange', 'ph-fill'); btnLoginIcon.classList.add('ph'); }
@@ -127,7 +136,6 @@ function setupLoginModal() {
     const form = document.getElementById('form-login');
     const btnToggle = document.getElementById('btn-toggle-mode');
     
-    // Controles del Nuevo Perfil
     const modalPerfil = document.getElementById('modal-perfil');
     const btnCerrarPerfil = document.getElementById('btn-cerrar-perfil');
     const btnCerrarSesionPerfil = document.getElementById('btn-cerrar-sesion-perfil');
@@ -138,7 +146,8 @@ function setupLoginModal() {
             if(currentUserData && currentUserData.role === 'admin') {
                 window.location.href = 'admin.html';
             } else {
-                // MAGIA: Abrimos el perfil del cliente en lugar de preguntar si quiere cerrar sesión
+                document.getElementById('perfil-vista-editar').classList.add('hidden');
+                document.getElementById('perfil-vista-datos').classList.remove('hidden');
                 modalPerfil.classList.remove('hidden');
                 cargarPerfilUsuario();
             }
@@ -159,7 +168,6 @@ function setupLoginModal() {
         }); 
     }
 
-    // Lógica para cerrar la ventana del perfil y cerrar sesión
     if(btnCerrarPerfil) btnCerrarPerfil.addEventListener('click', () => modalPerfil.classList.add('hidden'));
     if(btnCerrarSesionPerfil) {
         btnCerrarSesionPerfil.addEventListener('click', async () => {
@@ -212,7 +220,7 @@ function setupLoginModal() {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     uid = userCredential.user.uid;
                     await setDoc(doc(db, "users", uid), {
-                        name: name, email: email, phone: phone || '', role: 'client', createdAt: new Date().toISOString()
+                        name: name, email: email, phone: phone || '', address: '', role: 'client', createdAt: new Date().toISOString()
                     });
                     loginSuccess.textContent = '¡Cuenta creada con éxito!'; 
                     loginSuccess.classList.remove('hidden');
@@ -223,7 +231,7 @@ function setupLoginModal() {
                 currentUser = auth.currentUser;
 
                 if(currentUserData && currentUserData.role === 'admin') {
-                    setTimeout(() => { window.location.href = 'admin.html'; }, 1000);
+                    setTimeout(() => { window.location.href = 'admin.html'; }, 800);
                     return; 
                 }
 
@@ -244,6 +252,11 @@ function setupLoginModal() {
                         document.getElementById('checkout-total').textContent = `$${subtotalGlobal.toFixed(2)}`;
                         document.getElementById('checkout-total-bs').textContent = formatearMoneda(subtotalGlobal, 'VES');
                         
+                        // AUTOLLENAR DIRECCIÓN SI EL USUARIO LA GUARDÓ
+                        if(currentUserData && currentUserData.address) {
+                            document.getElementById('checkout-direccion').value = currentUserData.address;
+                        }
+
                         document.getElementById('modal-checkout').classList.remove('hidden');
                     } else {
                         window.location.reload(); 
@@ -252,7 +265,7 @@ function setupLoginModal() {
 
             } catch (error) {
                 console.error("Error en Auth:", error);
-                loginError.classList.remove('hidden'); loginError.textContent = 'Ocurrió un error. Verifica tus datos.';
+                loginError.classList.remove('hidden'); loginError.textContent = 'Error: Verifica tus credenciales o conexión.';
             } finally { 
                 btnSubmit.disabled = false; btnSubmit.innerHTML = originalText; 
             }
@@ -261,20 +274,83 @@ function setupLoginModal() {
 }
 
 // ==========================================
-// NUEVO: CARGAR PERFIL Y PEDIDOS DEL CLIENTE
+// NUEVO: LÓGICA DE PERFIL (EDICIÓN Y PEDIDOS)
 // ==========================================
+
+function setupPerfilEdicion() {
+    const btnEditar = document.getElementById('btn-editar-perfil');
+    const btnCancelar = document.getElementById('btn-cancelar-edicion');
+    const formEditar = document.getElementById('form-editar-perfil');
+    const vistaDatos = document.getElementById('perfil-vista-datos');
+    const vistaEditar = document.getElementById('perfil-vista-editar');
+
+    if(btnEditar) {
+        btnEditar.addEventListener('click', () => {
+            document.getElementById('edit-perfil-email').value = currentUser.email;
+            document.getElementById('edit-perfil-nombre').value = currentUserData?.name || '';
+            document.getElementById('edit-perfil-telefono').value = currentUserData?.phone || '';
+            document.getElementById('edit-perfil-direccion').value = currentUserData?.address || '';
+            
+            vistaDatos.classList.add('hidden');
+            vistaEditar.classList.remove('hidden');
+        });
+    }
+
+    if(btnCancelar) {
+        btnCancelar.addEventListener('click', () => {
+            vistaEditar.classList.add('hidden');
+            vistaDatos.classList.remove('hidden');
+        });
+    }
+
+    if(formEditar) {
+        formEditar.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btnGuardar = document.getElementById('btn-guardar-edicion');
+            const nombre = document.getElementById('edit-perfil-nombre').value.trim();
+            const telefono = document.getElementById('edit-perfil-telefono').value.trim();
+            const direccion = document.getElementById('edit-perfil-direccion').value.trim();
+
+            const originalText = btnGuardar.innerHTML;
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Guardando...';
+
+            try {
+                await updateDoc(doc(db, "users", currentUser.uid), {
+                    name: nombre, phone: telefono, address: direccion
+                });
+                
+                if(currentUserData) {
+                    currentUserData.name = nombre;
+                    currentUserData.phone = telefono;
+                    currentUserData.address = direccion;
+                }
+
+                window.cargarPerfilUsuario();
+                vistaEditar.classList.add('hidden');
+                vistaDatos.classList.remove('hidden');
+            } catch(err) {
+                console.error("Error actualizando perfil:", err);
+                alert("Ocurrió un error al guardar tus datos.");
+            } finally {
+                btnGuardar.disabled = false;
+                btnGuardar.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Guardar';
+            }
+        });
+    }
+}
+
 window.cargarPerfilUsuario = async () => {
     if(!currentUser) return;
     
-    // Llenar datos personales
     document.getElementById('perfil-nombre').textContent = currentUserData?.name || 'Cliente de Detalles y Sorpresas';
     document.getElementById('perfil-email').textContent = currentUser.email;
     document.getElementById('perfil-telefono').textContent = currentUserData?.phone || 'Sin teléfono registrado';
+    document.getElementById('perfil-direccion').textContent = currentUserData?.address || 'Sin dirección guardada';
     
     let inicial = (currentUserData?.name || 'U').charAt(0).toUpperCase();
     document.getElementById('perfil-avatar').textContent = inicial;
 
-    // Buscar historial de compras
     const lista = document.getElementById('perfil-pedidos-lista');
     lista.innerHTML = '<li class="text-center text-brand-blue py-6"><i class="ph-duotone ph-spinner animate-spin text-4xl mb-2"></i><p class="text-sm font-bold">Buscando tus pedidos...</p></li>';
 
@@ -293,7 +369,6 @@ window.cargarPerfilUsuario = async () => {
             return;
         }
 
-        // Ordenar del más reciente al más antiguo
         pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
         let htmlTemporal = '';
@@ -323,7 +398,7 @@ window.cargarPerfilUsuario = async () => {
                         <p class="text-xs text-gray-500"><i class="ph-fill ph-calendar-blank text-gray-400"></i> ${fechaF} <span class="mx-1">•</span> <i class="ph-fill ph-package text-gray-400"></i> ${cantItems} producto(s)</p>
                     </div>
                     <div class="text-left sm:text-right">
-                        <p class="font-black text-brand-pink text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
+                        <p class="font-black text-gray-800 text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
                         <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${pedido.metodoPago}</p>
                     </div>
                 </li>
@@ -403,7 +478,7 @@ function renderizarCatalogo(productosAMostrar) {
                     <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
                     <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
                     <div class="mt-auto flex items-center justify-between">
-                        <span class="text-base sm:text-2xl font-black text-brand-blue">$${prod.precio.toFixed(2)}</span>
+                        <span class="text-base sm:text-2xl font-black text-gray-800">$${prod.precio.toFixed(2)}</span>
                         <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
                             <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
                         </button>
@@ -734,7 +809,7 @@ function renderizarCarrito() {
             <img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${idReal}')" title="Ver detalles">
             <div class="flex-1">
                 <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${idReal}')">${item.nombre}</h4>
-                <p class="text-brand-blue font-bold">$${item.precio.toFixed(2)}</p>
+                <p class="text-gray-800 font-bold">$${item.precio.toFixed(2)}</p>
                 <div class="flex items-center gap-3 mt-2">
                     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
                         <button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button>
@@ -786,7 +861,7 @@ function renderizarCarrito() {
                                 <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${prodOferta.id}')">${prodOferta.nombre}</h4>
                                 <div class="flex items-baseline gap-2 mt-1">
                                     <span class="text-xs text-gray-400 line-through">$${prodOferta.precio.toFixed(2)}</span>
-                                    <span class="text-lg font-black text-brand-blue">$${precioConDescuento.toFixed(2)}</span>
+                                    <span class="text-lg font-black text-gray-800">$${precioConDescuento.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -808,7 +883,7 @@ function renderizarCarrito() {
 }
 
 // ==========================================
-// MÓDULO: CHECKOUT (TRANSACCIONES FIRESTORE)
+// MÓDULO: CHECKOUT Y REDIRECCIÓN WA
 // ==========================================
 
 function setupCheckout() {
@@ -846,6 +921,12 @@ function setupCheckout() {
             
             document.getElementById('checkout-total').textContent = `$${subtotalGlobal.toFixed(2)}`;
             document.getElementById('checkout-total-bs').textContent = formatearMoneda(subtotalGlobal, 'VES');
+
+            if(currentUserData && currentUserData.address) {
+                document.getElementById('checkout-direccion').value = currentUserData.address;
+            } else {
+                document.getElementById('checkout-direccion').value = '';
+            }
             
             modalCheckout.classList.remove('hidden');
         });
