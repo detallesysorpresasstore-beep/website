@@ -184,7 +184,7 @@
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
             <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                 <h3 id="modal-title" class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <i class="ph-fill ph-user-circle text-brand-blue text-2xl"></i> Mi Cuenta
+                    <i class="ph-fill ph-user-circle text-brand-blue text-2xl"></i> Iniciar Sesión
                 </h3>
                 <button id="btn-cerrar-login" class="text-gray-400 hover:text-red-500 transition-colors">
                     <i class="ph ph-x text-2xl"></i>
@@ -223,6 +223,50 @@
                     <span id="toggle-text">¿No tienes cuenta?</span> 
                     <button id="btn-toggle-mode" type="button" class="text-brand-blue font-bold hover:underline ml-1">Regístrate aquí</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-perfil" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="ph-fill ph-user-circle text-brand-blue text-2xl"></i> Mi Perfil
+                </h3>
+                <button id="btn-cerrar-perfil" class="text-gray-400 hover:text-red-500 transition-colors p-1">
+                    <i class="ph ph-x text-2xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto no-scrollbar flex flex-col gap-6">
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-4">
+                    <div class="h-16 w-16 rounded-full bg-brand-blue flex items-center justify-center text-white text-3xl font-bold uppercase shadow-sm" id="perfil-avatar">
+                        U
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-800 text-lg" id="perfil-nombre">Cargando...</h4>
+                        <p class="text-sm text-gray-600" id="perfil-email"></p>
+                        <p class="text-sm text-gray-600 mt-1"><i class="ph-fill ph-phone text-brand-orange"></i> <span id="perfil-telefono"></span></p>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3 text-sm uppercase flex items-center gap-2">
+                        <i class="ph-fill ph-shopping-bag text-brand-pink text-lg"></i> Mis Pedidos Recientes
+                    </h4>
+                    <div class="bg-gray-50 rounded-xl border border-gray-200 p-2 sm:p-4 overflow-y-auto max-h-[350px] no-scrollbar">
+                        <ul id="perfil-pedidos-lista" class="space-y-3">
+                            <li class="text-center text-gray-500 py-4"><i class="ph ph-spinner animate-spin text-2xl mb-2"></i> Cargando pedidos...</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                <p class="text-xs text-gray-400 italic">Si necesitas ayuda, contáctanos por WhatsApp.</p>
+                <button id="btn-cerrar-sesion-perfil" class="px-4 py-2 bg-red-50 text-red-500 font-bold hover:bg-red-500 hover:text-white rounded-lg shadow-sm flex items-center gap-2 transition-colors">
+                    <i class="ph-bold ph-sign-out"></i> Cerrar Sesión
+                </button>
             </div>
         </div>
     </div>
