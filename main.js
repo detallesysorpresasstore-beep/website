@@ -36,7 +36,6 @@ async function initApp() {
     await cargarCategoriasPublicas();
     await cargarProductosPublicos();
     
-    // NUEVO: Iniciar el slider dinámico de la página principal
     iniciarSliderHero();
     
     cargarCarritoLocal();
@@ -259,7 +258,7 @@ function renderizarCatalogo(productosAMostrar) {
                     <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
                     <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
                     <div class="mt-auto flex items-center justify-between">
-                        <span class="text-base sm:text-2xl font-black text-brand-pink">$${prod.precio.toFixed(2)}</span>
+                        <span class="text-base sm:text-2xl font-black text-brand-blue">$${prod.precio.toFixed(2)}</span>
                         <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
                             <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
                         </button>
@@ -284,7 +283,7 @@ window.limpiarFiltros = () => {
 };
 
 // ==========================================
-// NUEVO MÓDULO: SLIDER DINÁMICO (HERO)
+// MÓDULO: SLIDER DINÁMICO (HERO)
 // ==========================================
 window.diapositivasHero = [];
 let slideIndexActual = 0;
@@ -296,7 +295,6 @@ function iniciarSliderHero() {
 
     window.diapositivasHero = [];
 
-    // 1. Agregar Promociones a las diapositivas (Tienen prioridad)
     promocionesPublicas.forEach(promo => {
         const prod = window.productosPublicos.find(p => p.id === promo.productoOfertaId);
         if (prod && prod.imagenes && prod.imagenes.length > 0) {
@@ -311,9 +309,7 @@ function iniciarSliderHero() {
         }
     });
 
-    // 2. Extraer 1 producto llamativo por cada Subcategoría
     const subcategoriasVistas = new Set();
-    // Invertimos el arreglo para agarrar los más recientes primero
     const productosInvertidos = [...window.productosPublicos].reverse(); 
     
     productosInvertidos.forEach(prod => {
@@ -331,13 +327,11 @@ function iniciarSliderHero() {
         }
     });
 
-    // Si la base de datos está vacía, dejamos el placeholder estático
     if (window.diapositivasHero.length === 0) return;
 
-    // Iniciar el ciclo de fotos
     dibujarSlideHero();
     if(heroSliderInterval) clearInterval(heroSliderInterval);
-    heroSliderInterval = setInterval(siguienteSlideHero, 4000); // Cambia cada 4 segundos
+    heroSliderInterval = setInterval(siguienteSlideHero, 4000);
 }
 
 function dibujarSlideHero() {
@@ -345,7 +339,6 @@ function dibujarSlideHero() {
     if (!container || window.diapositivasHero.length === 0) return;
 
     const slide = window.diapositivasHero[slideIndexActual];
-    // Colores diferentes si es una Promo o un Producto normal
     const colorEtiqueta = slide.tipo === 'promo' ? 'bg-brand-pink text-white' : 'bg-white text-brand-blue';
 
     container.innerHTML = `
@@ -593,7 +586,7 @@ function renderizarCarrito() {
             <img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${idReal}')" title="Ver detalles">
             <div class="flex-1">
                 <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${idReal}')">${item.nombre}</h4>
-                <p class="text-brand-pink font-bold">$${item.precio.toFixed(2)}</p>
+                <p class="text-brand-blue font-bold">$${item.precio.toFixed(2)}</p>
                 <div class="flex items-center gap-3 mt-2">
                     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
                         <button onclick="modificarCantidadCarrito('${item.id}', -1)" class="px-2 py-1 text-gray-500 hover:text-brand-blue transition-colors"><i class="ph ph-minus"></i></button>
@@ -689,7 +682,6 @@ function setupCheckout() {
         btnProcesar.addEventListener('click', () => {
             if(!currentUser) {
                 if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
-                // NUEVO: Alerta visual y directa obligando a leer por qué debe registrarse
                 alert("🔒 Para continuar con el pago necesitamos que inicies sesión o registres tu cuenta. ¡Es rápido y muy fácil!");
                 document.getElementById('login-mensaje-checkout').classList.remove('hidden');
                 document.getElementById('modal-login').classList.remove('hidden');
@@ -825,7 +817,6 @@ function setupCheckout() {
                     await updateDoc(doc(db, "products", idRealBaseDB), { stock: increment(-item.cantidad) });
                 }
 
-                // Generar Mensaje WhatsApp
                 let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web. 🛍️\n\n`;
                 mensajeWa += `🧾 *Orden:* #${orderRef.id.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `👤 *Nombre:* ${orderData.clienteNombre}\n`;
