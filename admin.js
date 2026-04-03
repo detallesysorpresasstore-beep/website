@@ -56,11 +56,11 @@ const promoOfertaCategoria = document.getElementById('promo-oferta-categoria');
 const promoOfertaSubcategoria = document.getElementById('promo-oferta-subcategoria');
 const promoOfertaProducto = document.getElementById('promo-oferta-producto');
 
-// Colecciones en Firestore (CORRECCIÓN: Rutas limpias)
+// Colecciones en Firestore
 const productsCollection = collection(db, "products");
 const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
-const usersCollection = collection(db, "users"); // RUTA CORREGIDA
+const usersCollection = collection(db, "users"); 
 const paymentsCollection = collection(db, "payment_methods"); 
 const promosCollection = collection(db, "promotions"); 
 const configDocRef = doc(db, "config", "store_settings");
@@ -730,7 +730,7 @@ function dibujarTablaPedidos(arreglo) {
             <td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td>
             <td class="p-4 text-sm text-gray-600 font-medium">${fechaFormateada}</td>
             <td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td>
-            <td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td>
+            <td class="p-4 font-bold text-gray-800">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td>
             <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td>
             <td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td>
         </tr>`;
@@ -779,10 +779,10 @@ window.abrirModalPedido = (id) => {
                     <img src="${img}" class="w-12 h-12 rounded object-cover border border-gray-200">
                     <div class="flex-1">
                         <p class="text-sm font-bold text-gray-800 line-clamp-1">${prod.nombre}</p>
-                        <p class="text-xs text-gray-500">${prod.cantidad} und(s) x $${prod.precio.toFixed(2)}</p>
+                        <p class="text-xs text-gray-500">${prod.cantidad} und(s) x <span class="text-gray-800 font-bold">$${prod.precio.toFixed(2)}</span></p>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-bold text-brand-pink">$${(prod.cantidad * prod.precio).toFixed(2)}</p>
+                        <p class="text-sm font-bold text-gray-800">$${(prod.cantidad * prod.precio).toFixed(2)}</p>
                     </div>
                 </li>
             `;
