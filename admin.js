@@ -138,7 +138,7 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     if (filtroFechaPedidos) filtroFechaPedidos.addEventListener('change', aplicarFiltrosPedidos);
     if (filtroEstadoPedidos) filtroEstadoPedidos.addEventListener('change', aplicarFiltrosPedidos);
-    
+
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
     if (buscadorClientes) buscadorClientes.addEventListener('input', aplicarFiltrosClientes);
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
@@ -186,7 +186,7 @@ function configurarEventos() {
 }
 
 // ==========================================
-// NUEVO: FUNCIONES DIRECTAS PARA LIMPIAR HISTORIAL
+// FUNCIONES DIRECTAS PARA LIMPIAR HISTORIAL
 // ==========================================
 
 window.abrirModalLimpieza = () => {
@@ -208,7 +208,7 @@ window.ejecutarLimpiezaHistorial = async () => {
 
     const pedidosAEliminar = pedidosGlobales.filter(p => {
         if (!p.fecha) return false;
-        const fechaPedido = p.fecha.split('T')[0]; // Extrae formato "YYYY-MM-DD"
+        const fechaPedido = p.fecha.split('T')[0]; 
         return fechaPedido <= fechaLimite;
     });
 
@@ -230,7 +230,7 @@ window.ejecutarLimpiezaHistorial = async () => {
         }
         alert(`✅ Se eliminaron ${pedidosAEliminar.length} pedidos del historial de forma exitosa.`);
         modalLimpiar.classList.add('hidden');
-        cargarPedidos(); // Refresca la tabla en pantalla
+        cargarPedidos(); 
     } catch (error) {
         console.error("Error al limpiar historial:", error);
         alert("Ocurrió un error durante la limpieza del historial.");
@@ -353,17 +353,14 @@ window.eliminarPago = async (id) => {
 
 function actualizarSelectsPromocionesIniciales() {
     const selectCatCondicion = document.getElementById('promo-condicion-categoria');
-    
     if(selectCatCondicion) {
         selectCatCondicion.innerHTML = '<option value="">Cualquier Categoría</option>';
         categoriasGlobales.forEach(c => selectCatCondicion.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
     }
-    
     if(promoOfertaCategoria) {
         promoOfertaCategoria.innerHTML = '<option value="">Todas las categorías</option>';
         categoriasGlobales.forEach(c => promoOfertaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`);
     }
-
     filtrarProductosPromo(); 
 }
 
@@ -495,7 +492,7 @@ window.eliminarPromo = async (id) => {
 };
 
 // ==========================================
-// MÓDULOS ANTERIORES: CATEGORÍAS, PRODUCTOS Y CLIENTES
+// MÓDULOS: CATEGORÍAS, PRODUCTOS Y CLIENTES
 // ==========================================
 
 async function cargarCategorias() {
@@ -601,7 +598,7 @@ async function guardarProducto() {
     try {
         const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
         if (id) await updateDoc(doc(db, "products", id), datos); else { datos.fechaCreacion = new Date().toISOString(); await addDoc(productsCollection, datos); }
-        modalProducto.classList.add('hidden'); cargarProductos();
+        document.getElementById('modal-producto').classList.add('hidden'); cargarProductos();
     } catch (error) { console.error(error); } finally { btnGuardarProducto.disabled = false; btnGuardarProducto.innerText = "Guardar Producto"; }
 }
 
@@ -639,7 +636,7 @@ function resetearModalProducto(titulo) {
 
 window.prepararEdicionProd = (id) => {
     const prod = productosGlobales.find(p => p.id === id); if (!prod) return;
-    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); modalProducto.classList.remove('hidden');
+    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); document.getElementById('modal-producto').classList.remove('hidden');
 };
 
 window.eliminarProducto = async (id) => { if(confirm("¿Seguro que deseas eliminar este producto?")) { await deleteDoc(doc(db, "products", id)); cargarProductos(); } };
@@ -683,7 +680,7 @@ function exportarClientesExcel() {
 }
 
 // ==========================================
-// MÓDULO: PEDIDOS Y LIMPIEZA DE HISTORIAL
+// MÓDULO: PEDIDOS
 // ==========================================
 
 async function cargarPedidos() {
@@ -698,12 +695,42 @@ function aplicarFiltrosPedidos() {
 
 function dibujarTablaPedidos(arreglo) {
     const tbody = document.getElementById('admin-orders-list'); tbody.innerHTML = '';
-    if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron pedidos.</td></tr>'; return; }
+    // Ajustado colspan a 6 para incluir la columna de Fecha
+    if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500">No se encontraron pedidos.</td></tr>'; return; }
+    
     arreglo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
     arreglo.forEach((pedido) => {
         let colorEstado = 'bg-gray-100 text-gray-600';
-        if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700'; if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700'; if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700'; if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700'; if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
-        tbody.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td><td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td><td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td><td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td><td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td></tr>`;
+        if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700'; 
+        if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700'; 
+        if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700'; 
+        if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700'; 
+        if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700';
+
+        // Formatear Fecha
+        let fechaFormateada = 'N/A';
+        if (pedido.fecha) {
+            const fechaObj = new Date(pedido.fecha);
+            fechaFormateada = fechaObj.toLocaleDateString('es-VE', { 
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        }
+
+        tbody.innerHTML += `
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td>
+            <td class="p-4 text-sm text-gray-600 font-medium">${fechaFormateada}</td>
+            <td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td>
+            <td class="p-4 font-bold">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td>
+            <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td>
+            <td class="p-4 text-center">
+                <button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">
+                    Ver / Editar
+                </button>
+            </td>
+        </tr>`;
     });
 }
 
