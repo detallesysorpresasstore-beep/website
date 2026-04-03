@@ -141,7 +141,15 @@ function setupLoginModal() {
 
     if(btnAbrir) btnAbrir.addEventListener('click', abrirModal);
     if(btnAbrirMovil) btnAbrirMovil.addEventListener('click', abrirModal);
-    if(btnCerrar) { btnCerrar.addEventListener('click', () => { modal.classList.add('hidden'); form.reset(); }); }
+    
+    // CORRECCIÓN: Limpiar el aviso si el usuario cancela y cierra la ventana
+    if(btnCerrar) { 
+        btnCerrar.addEventListener('click', () => { 
+            modal.classList.add('hidden'); 
+            form.reset(); 
+            document.getElementById('login-mensaje-checkout').classList.add('hidden');
+        }); 
+    }
 
     if (btnToggle) {
         btnToggle.addEventListener('click', () => {
@@ -174,30 +182,69 @@ function setupLoginModal() {
             btnSubmit.disabled = true; btnSubmit.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Procesando...';
 
             try {
+                let uid = null;
+
                 if (isLoginMode) {
-                    await signInWithEmailAndPassword(auth, email, password);
-                    loginSuccess.textContent = '¡Bienvenido de nuevo!'; loginSuccess.classList.remove('hidden');
-                    setTimeout(async () => {
-                        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-                        if(userDoc.exists() && userDoc.data().role === 'admin') window.location.href = 'admin.html';
-                        else { modal.classList.add('hidden'); window.location.reload(); }
-                    }, 1000);
+                    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                    uid = userCredential.user.uid;
+                    loginSuccess.textContent = '¡Bienvenido de nuevo!'; 
+                    loginSuccess.classList.remove('hidden');
                 } else {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    // CORRECCIÓN: Ruta limpia de usuarios
-                    await setDoc(doc(db, "users", userCredential.user.uid), {
+                    uid = userCredential.user.uid;
+                    await setDoc(doc(db, "users", uid), {
                         name: name, email: email, phone: phone || '', role: 'client', createdAt: new Date().toISOString()
                     });
-                    loginSuccess.textContent = '¡Cuenta creada con éxito!'; loginSuccess.classList.remove('hidden');
-                    setTimeout(() => { modal.classList.add('hidden'); window.location.reload(); }, 1500);
+                    loginSuccess.textContent = '¡Cuenta creada con éxito!'; 
+                    loginSuccess.classList.remove('hidden');
                 }
+
+                // Cargar datos globalmente al instante
+                const userDoc = await getDoc(doc(db, "users", uid));
+                if(userDoc.exists()) currentUserData = userDoc.data();
+                currentUser = auth.currentUser;
+
+                // Redirigir al panel si es administrador
+                if(currentUserData && currentUserData.role === 'admin') {
+                    setTimeout(() => { window.location.href = 'admin.html'; }, 1000);
+                    return; 
+                }
+
+                // MAGIA: ¿El cliente venía del proceso de pago?
+                const vieneDelCheckout = !document.getElementById('login-mensaje-checkout').classList.contains('hidden');
+
+                setTimeout(() => {
+                    modal.classList.add('hidden'); // Ocultar el modal de registro
+                    
+                    if (vieneDelCheckout) {
+                        // Pasar directamente a la pantalla de Pago sin recargar
+                        const selectMetodo = document.getElementById('checkout-metodo');
+                        selectMetodo.innerHTML = '<option value="">Selecciona cómo vas a pagar...</option>';
+                        metodosPagoPublicos.forEach(m => { selectMetodo.innerHTML += `<option value="${m.id}">${m.nombre}</option>`; });
+                        
+                        document.getElementById('div-instrucciones-pago').classList.add('hidden'); 
+                        document.getElementById('div-referencia').classList.add('hidden'); 
+                        document.getElementById('div-comprobante').classList.add('hidden');
+                        
+                        document.getElementById('checkout-total').textContent = `$${subtotalGlobal.toFixed(2)}`;
+                        document.getElementById('checkout-total-bs').textContent = formatearMoneda(subtotalGlobal, 'VES');
+                        
+                        document.getElementById('modal-checkout').classList.remove('hidden');
+                    } else {
+                        // Si entró a la cuenta desde el botón normal del menú, refrescamos
+                        window.location.reload(); 
+                    }
+                }, 1000);
+
             } catch (error) {
+                console.error("Error en Auth:", error);
                 loginError.classList.remove('hidden'); loginError.textContent = 'Ocurrió un error. Verifica tus datos.';
-            } finally { btnSubmit.disabled = false; btnSubmit.innerHTML = originalText; }
+            } finally { 
+                btnSubmit.disabled = false; btnSubmit.innerHTML = originalText; 
+            }
         });
     }
 }
-
 // ==========================================
 // MÓDULO: TIENDA PÚBLICA (CATÁLOGO Y FILTROS)
 // ==========================================
