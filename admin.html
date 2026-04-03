@@ -33,6 +33,10 @@
         * { -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Scrollbar sutil para la caja de íconos */
+        .icon-scroll::-webkit-scrollbar { width: 6px; }
+        .icon-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .icon-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body class="text-gray-800 antialiased flex h-screen overflow-hidden relative">
@@ -344,7 +348,117 @@
 
         <div id="modal-producto" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"><div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-full"><div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 id="modal-titulo" class="text-lg font-bold text-gray-800">Añadir Nuevo Producto</h3><button id="btn-cerrar-modal-prod" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button></div><div class="p-6 overflow-y-auto"><form id="form-producto" class="space-y-4"><input type="hidden" id="prod-id"><input type="hidden" id="prod-imagenes-urls" value="[]"><div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label><input type="text" id="prod-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><div><label class="block text-sm font-medium text-gray-700 mb-1">Categoría *</label><select id="prod-categoria" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-white"><option value="">Cargando...</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Subcategoría *</label><select id="prod-subcategoria" required disabled class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-gray-50 text-gray-500"><option value="">Selecciona categoría</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Precio ($) *</label><input type="number" step="0.01" inputmode="decimal" id="prod-precio" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Stock (Unds) *</label><input type="number" id="prod-stock" required min="0" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Descripción del Producto</label><textarea id="prod-descripcion" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue resize-none"></textarea></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Galería de Imágenes *</label><label for="prod-imagen" class="flex flex-col items-center justify-center w-full h-24 border-2 border-brand-blue border-dashed rounded-xl cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors"><div class="flex flex-col items-center justify-center pt-2 pb-2"><i class="ph ph-images text-2xl text-brand-blue mb-1"></i><p class="text-sm font-semibold text-brand-blue">Haz clic para añadir fotos</p></div><input id="prod-imagen" type="file" multiple accept="image/png, image/jpeg, image/webp" class="hidden" /></label><div id="galeria-preview" class="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3"></div></div></form></div><div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3"><button id="btn-cancelar-modal-prod" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button><button id="btn-guardar-producto" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg shadow-sm">Guardar Producto</button></div></div></div>
         
-        <div id="modal-categoria" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"><div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"><div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 id="modal-titulo-cat" class="text-lg font-bold text-gray-800">Nueva Categoría Principal</h3><button id="btn-cerrar-modal-cat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button></div><div class="p-6"><form id="form-categoria" class="space-y-4"><div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Categoría *</label><input type="text" id="cat-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div><div><label class="block text-sm font-medium text-gray-700 mb-2">Selecciona un Ícono *</label><input type="hidden" id="cat-icono" value="ph-duotone ph-t-shirt"><div class="grid grid-cols-5 gap-2" id="icon-selector"><button type="button" data-icon="ph-duotone ph-t-shirt" class="icon-btn border-brand-blue bg-blue-50 text-brand-blue flex items-center justify-center h-12 border-2 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-t-shirt"></i></button><button type="button" data-icon="ph-duotone ph-dress" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-dress"></i></button><button type="button" data-icon="ph-duotone ph-moon-stars" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-moon-stars"></i></button><button type="button" data-icon="ph-duotone ph-baby" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-baby"></i></button><button type="button" data-icon="ph-duotone ph-teddy-bear" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-teddy-bear"></i></button><button type="button" data-icon="ph-duotone ph-train" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-train"></i></button><button type="button" data-icon="ph-duotone ph-horse" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-horse"></i></button><button type="button" data-icon="ph-duotone ph-rocket-launch" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-rocket-launch"></i></button><button type="button" data-icon="ph-duotone ph-puzzle-piece" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-puzzle-piece"></i></button><button type="button" data-icon="ph-duotone ph-star" class="icon-btn border-transparent bg-gray-50 text-gray-500 flex items-center justify-center h-12 border-2 hover:bg-gray-100 rounded-xl text-2xl transition-all"><i class="ph-duotone ph-star"></i></button></div></div></form></div><div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3"><button id="btn-cancelar-modal-cat" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button><button id="btn-guardar-categoria" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg shadow-sm">Guardar</button></div></div></div>
+        <div id="modal-categoria" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+                    <h3 id="modal-titulo-cat" class="text-lg font-bold text-gray-800">Nueva Categoría Principal</h3>
+                    <button id="btn-cerrar-modal-cat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
+                </div>
+                <div class="p-6 overflow-y-auto icon-scroll">
+                    <form id="form-categoria" class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la Categoría *</label>
+                            <input type="text" id="cat-nombre" placeholder="Ej: Ropa de Niñas" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-3">Selecciona el Ícono Visual *</label>
+                            <input type="hidden" id="cat-icono" value="ph-duotone ph-t-shirt">
+                            
+                            <div class="grid grid-cols-3 sm:grid-cols-4 gap-3" id="icon-selector">
+                                <button type="button" data-icon="ph-duotone ph-t-shirt" class="icon-btn border-brand-blue bg-blue-50 text-brand-blue flex flex-col items-center justify-center h-20 border-2 hover:bg-blue-50 rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-t-shirt text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Franelas/Niños</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-dress" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-dress text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Vestidos/Niñas</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-sneaker" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-sneaker text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Zapatos</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-baseball-cap" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-baseball-cap text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Gorras/Accs.</span>
+                                </button>
+
+                                <button type="button" data-icon="ph-duotone ph-baby" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-baby text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Bebés</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-teddy-bear" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-teddy-bear text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Peluches</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-puzzle-piece" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-puzzle-piece text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Armables/Lego</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-palette" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-palette text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Arte/Dibujo</span>
+                                </button>
+
+                                <button type="button" data-icon="ph-duotone ph-car-profile" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-car-profile text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Carritos/Pistas</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-game-controller" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-game-controller text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Videojuegos</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-robot" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-robot text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Robots/Figuras</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-rocket-launch" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-rocket-launch text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Aventura/Naves</span>
+                                </button>
+
+                                <button type="button" data-icon="ph-duotone ph-crown" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-crown text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Princesas/Cast.</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-magic-wand" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-magic-wand text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Magia/Fantasía</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-butterfly" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-butterfly text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Muñecas</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-star" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-star text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Destacados</span>
+                                </button>
+
+                                <button type="button" data-icon="ph-duotone ph-soccer-ball" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-soccer-ball text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Deportes</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-bicycle" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-bicycle text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Aire Libre</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-backpack" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-backpack text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Morrales/Bolsos</span>
+                                </button>
+                                <button type="button" data-icon="ph-duotone ph-ghost" class="icon-btn border-gray-200 bg-gray-50 text-gray-500 flex flex-col items-center justify-center h-20 border-2 hover:border-brand-blue hover:bg-blue-50 hover:text-brand-blue rounded-xl transition-all p-2 group">
+                                    <i class="ph-duotone ph-ghost text-3xl mb-1 group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[10px] leading-tight font-bold text-center">Disfraces/Terror</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
+                    <button id="btn-cancelar-modal-cat" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+                    <button id="btn-guardar-categoria" type="button" class="px-5 py-2 bg-brand-orange text-white font-medium hover:bg-orange-500 rounded-lg shadow-sm transition-colors">Guardar</button>
+                </div>
+            </div>
+        </div>
         
         <div id="modal-subcategoria" class="hidden absolute inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"><div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col"><div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 class="text-lg font-bold text-gray-800">Añadir Subcategoría</h3><button id="btn-cerrar-modal-subcat" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button></div><div class="p-6"><form id="form-subcategoria" class="space-y-4"><div><label class="block text-sm font-medium text-gray-700 mb-1">Categoría Padre *</label><select id="subcat-parent" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue bg-white"><option value="">Cargando...</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Nombre de Subcategoría *</label><input type="text" id="subcat-nombre" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-brand-blue"></div></form></div><div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3"><button id="btn-cancelar-modal-subcat" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button><button id="btn-guardar-subcategoria" type="button" class="px-5 py-2 bg-brand-blue text-white font-medium hover:bg-blue-500 rounded-lg shadow-sm">Guardar</button></div></div></div>
 
@@ -590,22 +704,41 @@
 
             navBtns.forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    navBtns.forEach(b => { b.classList.remove('bg-blue-50', 'text-brand-blue'); b.classList.add('text-gray-600'); b.querySelector('i').classList.remove('ph-fill'); b.querySelector('i').classList.add('ph'); });
+                    navBtns.forEach(b => { 
+                        b.classList.remove('bg-blue-50', 'text-brand-blue'); 
+                        b.classList.add('text-gray-600'); 
+                        b.querySelector('i').classList.remove('ph-fill'); 
+                        b.querySelector('i').classList.add('ph'); 
+                    });
                     const targetId = btn.getAttribute('data-target');
-                    btn.classList.remove('text-gray-600'); btn.classList.add('bg-blue-50', 'text-brand-blue'); btn.querySelector('i').classList.remove('ph'); btn.querySelector('i').classList.add('ph-fill');
+                    btn.classList.remove('text-gray-600'); 
+                    btn.classList.add('bg-blue-50', 'text-brand-blue'); 
+                    btn.querySelector('i').classList.remove('ph'); 
+                    btn.querySelector('i').classList.add('ph-fill');
                     tituloSeccion.innerText = titulos[targetId];
-                    vistas.forEach(v => v.classList.add('hidden')); document.getElementById(targetId).classList.remove('hidden');
+                    
+                    vistas.forEach(v => v.classList.add('hidden')); 
+                    document.getElementById(targetId).classList.remove('hidden');
                     if(window.innerWidth < 768) toggleMenu();
                 });
             });
 
+            // Lógica de Selección de Íconos
             const iconBtns = document.querySelectorAll('.icon-btn');
             const inputIcono = document.getElementById('cat-icono');
             if (iconBtns.length > 0) {
                 iconBtns.forEach(btn => {
                     btn.addEventListener('click', () => {
-                        iconBtns.forEach(b => { b.classList.remove('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); b.classList.add('border-transparent', 'bg-gray-50', 'text-gray-500'); });
-                        btn.classList.remove('border-transparent', 'bg-gray-50', 'text-gray-500'); btn.classList.add('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); inputIcono.value = btn.getAttribute('data-icon');
+                        // Resetear todos
+                        iconBtns.forEach(b => { 
+                            b.classList.remove('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); 
+                            b.classList.add('border-gray-200', 'bg-gray-50', 'text-gray-500'); 
+                        });
+                        // Marcar el activo
+                        btn.classList.remove('border-gray-200', 'bg-gray-50', 'text-gray-500'); 
+                        btn.classList.add('border-brand-blue', 'bg-blue-50', 'text-brand-blue'); 
+                        // Actualizar valor oculto
+                        inputIcono.value = btn.getAttribute('data-icon');
                     });
                 });
             }
