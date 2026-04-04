@@ -43,6 +43,8 @@ async function initApp() {
     cargarCarritoLocal();
     setupModalDetalle();
     setupCheckout(); 
+    
+    verificarCarritoAbandonado(); // NUEVO: Activamos el radar de ventas perdidas
 }
 
 // ==========================================
@@ -848,7 +850,60 @@ function cargarCarritoLocal() {
 
 function guardarCarritoLocal() {
     localStorage.setItem('ds_carrito', JSON.stringify(carritoCompras));
+    localStorage.setItem('ds_carrito_time', Date.now().toString()); // NUEVO: Guardamos el reloj
     renderizarCarrito();
+}
+
+// NUEVO: Estrategia de Carrito Abandonado
+function verificarCarritoAbandonado() {
+    const guardado = localStorage.getItem('ds_carrito');
+    const tiempoStr = localStorage.getItem('ds_carrito_time');
+    
+    if (guardado && tiempoStr) {
+        try {
+            const items = JSON.parse(guardado);
+            if (items.length > 0) {
+                const tiempoAnterior = parseInt(tiempoStr);
+                const ahora = Date.now();
+                const diferenciaHoras = (ahora - tiempoAnterior) / (1000 * 60 * 60);
+                
+                // Si ha pasado más de 30 minutos (0.5 horas) y menos de 72 horas (3 días)
+                if (diferenciaHoras >= 0.5 && diferenciaHoras <= 72) {
+                    mostrarToastCarritoAbandonado();
+                }
+            }
+        } catch (e) { console.error("Error al leer carrito para abandono"); }
+    }
+}
+
+function mostrarToastCarritoAbandonado() {
+    const toast = document.getElementById('toast-carrito-abandonado');
+    if(!toast) return;
+    
+    // Mostramos el mensaje 3 segundos después de que el usuario entra a la web
+    setTimeout(() => {
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.remove('translate-y-full', 'opacity-0');
+        }, 50);
+    }, 3000);
+
+    const btnCerrar = document.getElementById('btn-cerrar-toast-carrito');
+    const btnRecuperar = document.getElementById('btn-recuperar-carrito');
+
+    const ocultarToast = () => {
+        toast.classList.add('translate-y-full', 'opacity-0');
+        setTimeout(() => toast.classList.add('hidden'), 500);
+        // Reseteamos el reloj para no volver a molestarlo hoy
+        localStorage.setItem('ds_carrito_time', Date.now().toString());
+    };
+
+    if(btnCerrar) btnCerrar.onclick = ocultarToast;
+    if(btnRecuperar) btnRecuperar.onclick = () => {
+        ocultarToast();
+        document.getElementById('cart-sidebar').classList.remove('translate-x-full');
+        document.getElementById('cart-overlay').classList.remove('hidden');
+    };
 }
 
 window.agregarPromoAlCarrito = (idProductoOriginal, precioPromo) => {
