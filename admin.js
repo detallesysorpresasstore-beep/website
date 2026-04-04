@@ -48,13 +48,20 @@ const modalPago = document.getElementById('modal-pago');
 const btnNuevoPago = document.getElementById('btn-nuevo-pago');
 const btnGuardarPago = document.getElementById('btn-guardar-pago');
 
-// Promociones y Filtros en Cascada
+// Promociones (Upsell)
 const modalPromocion = document.getElementById('modal-promocion');
 const btnNuevaPromocion = document.getElementById('btn-nueva-promocion');
 const btnGuardarPromocion = document.getElementById('btn-guardar-promocion');
 const promoOfertaCategoria = document.getElementById('promo-oferta-categoria');
 const promoOfertaSubcategoria = document.getElementById('promo-oferta-subcategoria');
 const promoOfertaProducto = document.getElementById('promo-oferta-producto');
+
+// NUEVO: Ofertas Directas
+const modalOferta = document.getElementById('modal-oferta');
+const btnNuevaOferta = document.getElementById('btn-nueva-oferta');
+const btnGuardarOferta = document.getElementById('btn-guardar-oferta');
+const selectOfertaProducto = document.getElementById('oferta-producto');
+const inputOfertaDescuento = document.getElementById('oferta-descuento');
 
 // Colecciones en Firestore
 const productsCollection = collection(db, "products");
@@ -183,6 +190,25 @@ function configurarEventos() {
             filtrarProductosPromo();
         });
     }
+
+    // NUEVO: Eventos de Ofertas Directas
+    if (btnNuevaOferta) {
+        btnNuevaOferta.addEventListener('click', () => {
+            document.getElementById('form-oferta').reset();
+            selectOfertaProducto.innerHTML = '<option value="">Selecciona un producto...</option>';
+            
+            // Cargar solo productos que NO estén en oferta actualmente
+            productosGlobales.forEach(p => {
+                if(!p.descuento || p.descuento === 0) {
+                    selectOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio.toFixed(2)})</option>`;
+                }
+            });
+            modalOferta.classList.remove('hidden');
+        });
+    }
+    document.getElementById('btn-cerrar-modal-oferta').addEventListener('click', () => modalOferta.classList.add('hidden'));
+    document.getElementById('btn-cancelar-modal-oferta').addEventListener('click', () => modalOferta.classList.add('hidden'));
+    if (btnGuardarOferta) btnGuardarOferta.addEventListener('click', guardarOferta);
 }
 
 // ==========================================
@@ -350,7 +376,7 @@ window.eliminarPago = async (id) => {
 };
 
 // ==========================================
-// MÓDULO: PROMOCIONES (CON FILTROS EN CASCADA)
+// MÓDULO: PROMOCIONES (UPSELL EN CARRITO)
 // ==========================================
 
 function actualizarSelectsPromocionesIniciales() {
@@ -403,7 +429,7 @@ function filtrarProductosPromo() {
     });
 
     filtrados.forEach(p => {
-        promoOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio})</option>`;
+        promoOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio.toFixed(2)})</option>`;
     });
 }
 
@@ -494,6 +520,81 @@ window.eliminarPromo = async (id) => {
         await deleteDoc(doc(db, "promotions", id)); cargarPromociones();
     }
 };
+
+// ==========================================
+// NUEVO MÓDULO: OFERTAS DIRECTAS (CATÁLOGO)
+// ==========================================
+
+async function guardarOferta() {
+    const prodId = selectOfertaProducto.value;
+    const descuento = parseInt(inputOfertaDescuento.value) || 0;
+
+    if(!prodId || descuento <= 0 || descuento >= 100) return alert("Selecciona un producto y un descuento válido (1 al 99%).");
+
+    btnGuardarOferta.disabled = true; 
+    btnGuardarOferta.innerText = "Guardando...";
+    try {
+        await updateDoc(doc(db, "products", prodId), { descuento: descuento });
+        modalOferta.classList.add('hidden');
+        cargarProductos(); // Esto refrescará tanto la tabla de productos como la de ofertas
+    } catch (error) { 
+        alert("Error al aplicar la oferta."); 
+        console.error(error); 
+    } finally { 
+        btnGuardarOferta.disabled = false; 
+        btnGuardarOferta.innerText = "Guardar Oferta"; 
+    }
+}
+
+function dibujarTablaOfertas() {
+    const tbody = document.getElementById('admin-ofertas-list');
+    if(!tbody) return;
+
+    // Filtramos los productos que tengan un descuento activo
+    const ofertasActivas = productosGlobales.filter(p => p.descuento > 0);
+
+    if (ofertasActivas.length === 0) { 
+        tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No hay productos en oferta actualmente.</td></tr>'; 
+        return; 
+    }
+
+    let htmlTemporal = '';
+    ofertasActivas.forEach(p => {
+        const imgPortada = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : 'https://via.placeholder.com/50';
+        const precioOriginal = p.precio;
+        const precioFinal = p.precio * (1 - (p.descuento / 100));
+
+        htmlTemporal += `
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="p-4">
+                    <div class="flex items-center gap-3">
+                        <img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover border border-gray-200">
+                        <span class="font-medium text-gray-800 line-clamp-1">${p.nombre}</span>
+                    </div>
+                </td>
+                <td class="p-4 font-bold text-gray-400 line-through">$${precioOriginal.toFixed(2)}</td>
+                <td class="p-4"><span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-black">-${p.descuento}%</span></td>
+                <td class="p-4 font-black text-brand-blue text-lg">$${precioFinal.toFixed(2)}</td>
+                <td class="p-4 text-center">
+                    <button onclick="eliminarOferta('${p.id}')" title="Quitar descuento" class="text-gray-400 hover:text-red-500 p-1 bg-white rounded-full shadow-sm border border-gray-100"><i class="ph-bold ph-x text-lg"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = htmlTemporal;
+}
+
+window.eliminarOferta = async (id) => {
+    if(confirm("¿Seguro que deseas quitar esta oferta? El producto volverá a su precio original.")) {
+        try {
+            await updateDoc(doc(db, "products", id), { descuento: 0 });
+            cargarProductos();
+        } catch (e) {
+            console.error("Error al quitar oferta:", e);
+        }
+    }
+};
+
 
 // ==========================================
 // MÓDULOS: CATEGORÍAS, PRODUCTOS Y CLIENTES
@@ -619,6 +720,7 @@ async function cargarProductos() {
             const prod = docSnap.data(); prod.id = docSnap.id; prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []); prod.stock = prod.stock !== undefined ? prod.stock : 10; prod.subcategoria = prod.subcategoria || 'General'; productosGlobales.push(prod);
         });
         aplicarFiltrosProductos();
+        dibujarTablaOfertas(); // NUEVO: Refresca también la tabla de ofertas
     } catch (error) { console.error(error); }
 }
 
@@ -637,7 +739,11 @@ function dibujarTablaProductos(arreglo) {
         const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/150';
         let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
         const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span><span class="text-xs text-gray-400 block">${prod.imagenes.length} foto(s)</span></div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        
+        // Etiqueta visual si el producto tiene descuento
+        const etiquetaOferta = (prod.descuento && prod.descuento > 0) ? `<br><span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold mt-1 inline-block">-${prod.descuento}% OFF</span>` : '';
+
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
