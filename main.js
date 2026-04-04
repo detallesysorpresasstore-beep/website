@@ -1,5 +1,5 @@
 /**
- * Detalles y Sorpresas STORE - Archivo Principal JS
+ * Detalles y Sorpresas STORE - Archivo Principal JS (Tienda Pública)
  */
 
 import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function initApp() {
     setupMobileMenu();
     setupLoginModal();
-    setupPerfilEdicion(); // NUEVO: Configura la edición de perfil
+    setupPerfilEdicion(); 
     monitorAuthState();
     setupLightbox(); 
     
@@ -252,7 +252,6 @@ function setupLoginModal() {
                         document.getElementById('checkout-total').textContent = `$${subtotalGlobal.toFixed(2)}`;
                         document.getElementById('checkout-total-bs').textContent = formatearMoneda(subtotalGlobal, 'VES');
                         
-                        // AUTOLLENAR DIRECCIÓN SI EL USUARIO LA GUARDÓ
                         if(currentUserData && currentUserData.address) {
                             document.getElementById('checkout-direccion').value = currentUserData.address;
                         }
@@ -274,7 +273,7 @@ function setupLoginModal() {
 }
 
 // ==========================================
-// NUEVO: LÓGICA DE PERFIL (EDICIÓN Y PEDIDOS)
+// LÓGICA DE PERFIL (EDICIÓN Y PEDIDOS)
 // ==========================================
 
 function setupPerfilEdicion() {
@@ -439,66 +438,109 @@ async function cargarProductosPublicos() {
     try {
         const querySnapshot = await getDocs(collection(db, "products"));
         window.productosPublicos = []; 
+        let listaOfertas = [];
+
         querySnapshot.forEach((docSnap) => {
             const prod = docSnap.data(); prod.id = docSnap.id;
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
             prod.stock = prod.stock !== undefined ? prod.stock : 10;
+            
+            // LÓGICA DE OFERTAS: Calculamos el nuevo precio si tiene descuento
+            if(prod.descuento && prod.descuento > 0) {
+                prod.precioOriginal = prod.precio; // Guardamos el viejo para mostrarlo tachado
+                prod.precio = prod.precio * (1 - (prod.descuento / 100)); // Precio matemático real
+                if(prod.stock > 0) listaOfertas.push(prod);
+            }
+
             if(prod.stock > 0) window.productosPublicos.push(prod);
         });
+
         renderizarCatalogo(window.productosPublicos);
+        renderizarOfertas(listaOfertas); // Inyectamos las ofertas en su propia sección
     } catch (error) { console.error(error); }
+}
+
+// Función auxiliar para renderizar tarjetas de producto (Catálogo y Ofertas)
+function generarHtmlTarjetaProducto(prod) {
+    const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
+    let imgHTML = imgPortada.startsWith('http') 
+        ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
+        : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
+        
+    let precioHTML = `<span class="text-base sm:text-2xl font-black text-gray-800">$${prod.precio.toFixed(2)}</span>`;
+    let badgeHTML = '';
+
+    // Si tiene descuento, mostramos la etiqueta roja y el precio tachado
+    if(prod.descuento && prod.descuento > 0) {
+        badgeHTML = `<div class="absolute top-2 left-2 bg-red-500 text-white text-[10px] sm:text-xs font-black px-2 py-1 rounded-md shadow-md z-10">-${prod.descuento}%</div>`;
+        precioHTML = `
+            <div class="flex flex-col">
+                <span class="text-[10px] sm:text-xs text-gray-400 line-through leading-none mb-0.5">$${prod.precioOriginal.toFixed(2)}</span>
+                <span class="text-base sm:text-2xl font-black text-brand-orange leading-none">$${prod.precio.toFixed(2)}</span>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md relative" onclick="abrirModalDetalle('${prod.id}')">
+            ${badgeHTML}
+            <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
+                ${imgHTML}
+                <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                    <span class="bg-white text-gray-800 font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full shadow-lg flex items-center gap-1 sm:gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all text-xs sm:text-base">
+                        <i class="ph ph-eye sm:text-xl"></i> <span class="hidden sm:inline">Ver Detalle</span>
+                    </span>
+                </div>
+            </div>
+            <div class="p-3 sm:p-5 flex flex-col flex-grow z-10">
+                <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
+                <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
+                <div class="mt-auto flex items-center justify-between">
+                    ${precioHTML}
+                    <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
+                        <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderizarCatalogo(productosAMostrar) {
     const contenedor = document.getElementById('public-products'); 
-    
     if (productosAMostrar.length === 0) {
         contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`; 
         return;
     }
-
     let htmlTemporal = '';
-    productosAMostrar.forEach(prod => {
-        const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
-        let imgHTML = imgPortada.startsWith('http') 
-            ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
-            : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
-            
-        htmlTemporal += `
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md" onclick="abrirModalDetalle('${prod.id}')">
-                <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
-                    ${imgHTML}
-                    <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="bg-white text-gray-800 font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full shadow-lg flex items-center gap-1 sm:gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all text-xs sm:text-base">
-                            <i class="ph ph-eye sm:text-xl"></i> <span class="hidden sm:inline">Ver Detalle</span>
-                        </span>
-                    </div>
-                </div>
-                <div class="p-3 sm:p-5 flex flex-col flex-grow">
-                    <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
-                    <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
-                    <div class="mt-auto flex items-center justify-between">
-                        <span class="text-base sm:text-2xl font-black text-gray-800">$${prod.precio.toFixed(2)}</span>
-                        <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
-                            <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
+    productosAMostrar.forEach(prod => { htmlTemporal += generarHtmlTarjetaProducto(prod); });
     contenedor.innerHTML = htmlTemporal;
+}
+
+function renderizarOfertas(listaOfertas) {
+    const seccionOfertas = document.getElementById('ofertas');
+    const contenedorOfertas = document.getElementById('public-ofertas');
+    
+    if (listaOfertas.length === 0) {
+        seccionOfertas.classList.add('hidden');
+        return;
+    }
+
+    seccionOfertas.classList.remove('hidden');
+    let htmlTemporal = '';
+    listaOfertas.forEach(prod => { htmlTemporal += generarHtmlTarjetaProducto(prod); });
+    contenedorOfertas.innerHTML = htmlTemporal;
 }
 
 window.filtrarPorCategoria = (categoriaNombre) => {
     const filtrados = window.productosPublicos.filter(p => p.categoria === categoriaNombre);
-    const tituloSeccion = document.querySelector('#destacados h2');
+    const tituloSeccion = document.getElementById('titulo-catalogo');
     if (tituloSeccion) tituloSeccion.innerHTML = `Categoría: <span class="text-brand-pink">${categoriaNombre}</span> <button onclick="limpiarFiltros()" class="ml-4 align-middle text-sm bg-gray-100 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-full hover:bg-gray-200 transition-colors shadow-sm inline-flex items-center gap-1"><i class="ph ph-x"></i> Ver todo</button>`;
     renderizarCatalogo(filtrados);
 };
 
 window.limpiarFiltros = () => {
-    const tituloSeccion = document.querySelector('#destacados h2');
+    const tituloSeccion = document.getElementById('titulo-catalogo');
     if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-pink">Nuevo</span>`;
     renderizarCatalogo(window.productosPublicos);
 };
@@ -654,7 +696,13 @@ function setupModalDetalle() {
         document.getElementById('detalle-subcategoria').textContent = prod.subcategoria || '';
         document.getElementById('detalle-nombre').textContent = prod.nombre;
         
-        document.getElementById('detalle-precio').textContent = `$${prod.precio.toFixed(2)}`;
+        // MODIFICACIÓN: Mostrar precio tachado si hay descuento
+        if(prod.descuento && prod.descuento > 0) {
+            document.getElementById('detalle-precio').innerHTML = `<span class="text-gray-400 line-through text-xl mr-2">$${prod.precioOriginal.toFixed(2)}</span><span class="text-brand-orange">$${prod.precio.toFixed(2)}</span>`;
+        } else {
+            document.getElementById('detalle-precio').innerHTML = `<span class="text-gray-800">$${prod.precio.toFixed(2)}</span>`;
+        }
+        
         document.getElementById('detalle-precio-bs').textContent = formatearMoneda(prod.precio, 'VES');
         
         document.getElementById('detalle-descripcion').textContent = prod.descripcion || 'Este producto no tiene una descripción detallada.';
@@ -860,8 +908,8 @@ function renderizarCarrito() {
                             <div class="flex-1">
                                 <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${prodOferta.id}')">${prodOferta.nombre}</h4>
                                 <div class="flex items-baseline gap-2 mt-1">
-                                    <span class="text-xs text-gray-400 line-through">$${prodOferta.precio.toFixed(2)}</span>
-                                    <span class="text-lg font-black text-gray-800">$${precioConDescuento.toFixed(2)}</span>
+                                    <span class="text-xs text-gray-400 line-through">$${prodOferta.precioOriginal ? prodOferta.precioOriginal.toFixed(2) : prodOferta.precio.toFixed(2)}</span>
+                                    <span class="text-lg font-black text-brand-blue">$${precioConDescuento.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
