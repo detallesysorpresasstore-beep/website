@@ -56,11 +56,14 @@ const promoOfertaCategoria = document.getElementById('promo-oferta-categoria');
 const promoOfertaSubcategoria = document.getElementById('promo-oferta-subcategoria');
 const promoOfertaProducto = document.getElementById('promo-oferta-producto');
 
-// NUEVO: Ofertas Directas
+// Ofertas Directas (NUEVO)
 const modalOferta = document.getElementById('modal-oferta');
 const btnNuevaOferta = document.getElementById('btn-nueva-oferta');
 const btnGuardarOferta = document.getElementById('btn-guardar-oferta');
-const selectOfertaProducto = document.getElementById('oferta-producto');
+const buscadorOfertaProducto = document.getElementById('buscador-oferta-producto');
+const filtroOfertaCategoria = document.getElementById('filtro-oferta-categoria');
+const listaOfertaProductos = document.getElementById('lista-oferta-productos');
+const inputOfertaProductoId = document.getElementById('oferta-producto-id');
 const inputOfertaDescuento = document.getElementById('oferta-descuento');
 
 // Colecciones en Firestore
@@ -191,24 +194,28 @@ function configurarEventos() {
         });
     }
 
-    // NUEVO: Eventos de Ofertas Directas
+    // EVENTOS PARA OFERTAS DIRECTAS
     if (btnNuevaOferta) {
         btnNuevaOferta.addEventListener('click', () => {
             document.getElementById('form-oferta').reset();
-            selectOfertaProducto.innerHTML = '<option value="">Selecciona un producto...</option>';
+            inputOfertaProductoId.value = '';
             
-            // Cargar solo productos que NO estén en oferta actualmente
-            productosGlobales.forEach(p => {
-                if(!p.descuento || p.descuento === 0) {
-                    selectOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio.toFixed(2)})</option>`;
-                }
+            // Llenar select de categorías en el buscador
+            filtroOfertaCategoria.innerHTML = '<option value="">Todas las Categorías</option>';
+            categoriasGlobales.forEach(c => {
+                filtroOfertaCategoria.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
             });
+
+            aplicarFiltrosBuscadorOfertas();
             modalOferta.classList.remove('hidden');
         });
     }
     document.getElementById('btn-cerrar-modal-oferta').addEventListener('click', () => modalOferta.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-oferta').addEventListener('click', () => modalOferta.classList.add('hidden'));
     if (btnGuardarOferta) btnGuardarOferta.addEventListener('click', guardarOferta);
+
+    if (buscadorOfertaProducto) buscadorOfertaProducto.addEventListener('input', aplicarFiltrosBuscadorOfertas);
+    if (filtroOfertaCategoria) filtroOfertaCategoria.addEventListener('change', aplicarFiltrosBuscadorOfertas);
 }
 
 // ==========================================
@@ -376,7 +383,7 @@ window.eliminarPago = async (id) => {
 };
 
 // ==========================================
-// MÓDULO: PROMOCIONES (UPSELL EN CARRITO)
+// MÓDULO: PROMOCIONES (CON FILTROS EN CASCADA)
 // ==========================================
 
 function actualizarSelectsPromocionesIniciales() {
@@ -429,7 +436,7 @@ function filtrarProductosPromo() {
     });
 
     filtrados.forEach(p => {
-        promoOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio.toFixed(2)})</option>`;
+        promoOfertaProducto.innerHTML += `<option value="${p.id}">${p.nombre} (PVP: $${p.precio})</option>`;
     });
 }
 
@@ -525,14 +532,69 @@ window.eliminarPromo = async (id) => {
 // NUEVO MÓDULO: OFERTAS DIRECTAS (CATÁLOGO)
 // ==========================================
 
+function aplicarFiltrosBuscadorOfertas() {
+    if(!listaOfertaProductos) return;
+    const texto = buscadorOfertaProducto.value.toLowerCase();
+    const categoria = filtroOfertaCategoria.value;
+
+    // Buscar solo productos que NO tengan descuento actual
+    const filtrados = productosGlobales.filter(p => {
+        const sinDescuento = !p.descuento || p.descuento === 0;
+        const matchTexto = p.nombre.toLowerCase().includes(texto);
+        const matchCat = categoria === "" || p.categoria === categoria;
+        return sinDescuento && matchTexto && matchCat;
+    });
+
+    listaOfertaProductos.innerHTML = '';
+    if(filtrados.length === 0) {
+        listaOfertaProductos.innerHTML = '<div class="p-4 text-center text-sm text-gray-500">No se encontraron productos sin oferta.</div>';
+        return;
+    }
+
+    filtrados.forEach(p => {
+        const img = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : 'https://via.placeholder.com/50';
+        
+        // Creamos la fila clickeable del buscador
+        const div = document.createElement('div');
+        div.className = 'p-3 flex items-center gap-3 cursor-pointer hover:bg-blue-50 transition-colors oferta-item border-b border-gray-100 last:border-0';
+        div.onclick = () => seleccionarProductoOferta(p.id, div);
+        
+        div.innerHTML = `
+            <img src="${img}" class="w-10 h-10 rounded-md object-cover border border-gray-200">
+            <div class="flex-1">
+                <p class="text-sm font-bold text-gray-800 line-clamp-1">${p.nombre}</p>
+                <p class="text-xs text-gray-500">${p.categoria} | PVP: $${p.precio.toFixed(2)}</p>
+            </div>
+            <div class="text-brand-blue opacity-0 check-icon transition-opacity"><i class="ph-fill ph-check-circle text-xl"></i></div>
+        `;
+        listaOfertaProductos.appendChild(div);
+    });
+}
+
+window.seleccionarProductoOferta = (id, elementoDiv) => {
+    inputOfertaProductoId.value = id;
+    
+    // Limpiar selección de otros elementos
+    document.querySelectorAll('.oferta-item').forEach(el => {
+        el.classList.remove('bg-blue-50');
+        el.querySelector('.check-icon').classList.add('opacity-0');
+    });
+    
+    // Marcar elemento actual
+    elementoDiv.classList.add('bg-blue-50');
+    elementoDiv.querySelector('.check-icon').classList.remove('opacity-0');
+};
+
 async function guardarOferta() {
-    const prodId = selectOfertaProducto.value;
+    const prodId = inputOfertaProductoId.value;
     const descuento = parseInt(inputOfertaDescuento.value) || 0;
 
-    if(!prodId || descuento <= 0 || descuento >= 100) return alert("Selecciona un producto y un descuento válido (1 al 99%).");
+    if(!prodId || descuento <= 0 || descuento >= 100) {
+        return alert("Debes seleccionar un producto de la lista y asignar un descuento válido (1 al 99%).");
+    }
 
     btnGuardarOferta.disabled = true; 
-    btnGuardarOferta.innerText = "Guardando...";
+    btnGuardarOferta.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Guardando...';
     try {
         await updateDoc(doc(db, "products", prodId), { descuento: descuento });
         modalOferta.classList.add('hidden');
@@ -542,7 +604,7 @@ async function guardarOferta() {
         console.error(error); 
     } finally { 
         btnGuardarOferta.disabled = false; 
-        btnGuardarOferta.innerText = "Guardar Oferta"; 
+        btnGuardarOferta.innerHTML = '<i class="ph-bold ph-check-circle"></i> Guardar Oferta'; 
     }
 }
 
@@ -594,7 +656,6 @@ window.eliminarOferta = async (id) => {
         }
     }
 };
-
 
 // ==========================================
 // MÓDULOS: CATEGORÍAS, PRODUCTOS Y CLIENTES
@@ -720,7 +781,7 @@ async function cargarProductos() {
             const prod = docSnap.data(); prod.id = docSnap.id; prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []); prod.stock = prod.stock !== undefined ? prod.stock : 10; prod.subcategoria = prod.subcategoria || 'General'; productosGlobales.push(prod);
         });
         aplicarFiltrosProductos();
-        dibujarTablaOfertas(); // NUEVO: Refresca también la tabla de ofertas
+        dibujarTablaOfertas(); // Refresca la tabla de ofertas también
     } catch (error) { console.error(error); }
 }
 
@@ -740,7 +801,6 @@ function dibujarTablaProductos(arreglo) {
         let imgHTML = imgPortada.startsWith('http') ? `<img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover">` : `<div class="h-10 w-10 bg-gray-100 flex items-center justify-center"><i class="${imgPortada}"></i></div>`;
         const stockColor = prod.stock <= 3 ? 'text-red-500 font-bold' : 'text-brand-blue font-medium';
         
-        // Etiqueta visual si el producto tiene descuento
         const etiquetaOferta = (prod.descuento && prod.descuento > 0) ? `<br><span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold mt-1 inline-block">-${prod.descuento}% OFF</span>` : '';
 
         htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
