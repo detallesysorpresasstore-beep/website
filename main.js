@@ -57,6 +57,14 @@ async function cargarConfiguracionPublica() {
             configuracionTienda.tasaBcv = parseFloat(data.tasaBcv) || 1;
             configuracionTienda.tasaCop = parseFloat(data.tasaCop) || 1;
             configuracionTienda.whatsapp = data.whatsapp || ''; 
+
+            // Mostrar botón de WhatsApp flotante si hay un número configurado
+            const btnWaFlotante = document.getElementById('btn-whatsapp-flotante');
+            if (btnWaFlotante && configuracionTienda.whatsapp) {
+                const numeroLimpio = configuracionTienda.whatsapp.replace(/\D/g,'');
+                btnWaFlotante.href = `https://wa.me/${numeroLimpio}?text=Hola,%20tengo%20una%20duda%20sobre%20los%20productos%20de%20la%20tienda.`;
+                btnWaFlotante.classList.remove('hidden');
+            }
         }
     } catch (error) { console.error("Error al cargar configuración:", error); }
 }
@@ -472,7 +480,7 @@ async function cargarProductosPublicos() {
 function generarHtmlTarjetaProducto(prod) {
     const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
     let imgHTML = imgPortada.startsWith('http') 
-        ? `<img src="${imgPortada}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
+        ? `<img src="${imgPortada}" loading="lazy" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">` 
         : `<div class="w-full h-full flex items-center justify-center bg-gray-100 text-4xl sm:text-6xl text-gray-300"><i class="${imgPortada}"></i></div>`;
         
     let precioHTML = `<span class="text-base sm:text-2xl font-black text-gray-800">$${prod.precio.toFixed(2)}</span>`;
