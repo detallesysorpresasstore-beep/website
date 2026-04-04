@@ -42,7 +42,7 @@
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
-                <div class="flex-shrink-0 flex items-center cursor-pointer">
+                <div class="flex-shrink-0 flex items-center cursor-pointer" onclick="window.scrollTo(0,0)">
                     <div class="text-2xl font-bold flex flex-col leading-none text-center">
                         <span class="tracking-wide">
                             <i class="ph-fill ph-star text-brand-yellow text-xl"></i>
@@ -56,9 +56,12 @@
                 </div>
 
                 <nav class="hidden md:flex space-x-8">
-                    <a href="#" class="text-gray-600 hover:text-brand-orange font-medium transition-colors">Inicio</a>
-                    <a href="#categorias" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Categorías</a>
-                    <a href="#destacados" class="text-gray-600 hover:text-brand-pink font-medium transition-colors">Novedades</a>
+                    <a href="#" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Inicio</a>
+                    <a href="#categorias" class="text-gray-600 hover:text-brand-pink font-medium transition-colors">Categorías</a>
+                    <a href="#ofertas" class="text-brand-orange font-bold hover:text-orange-600 transition-colors flex items-center gap-1">
+                        <i class="ph-fill ph-tag"></i> Ofertas
+                    </a>
+                    <a href="#destacados" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Novedades</a>
                 </nav>
 
                 <div class="flex items-center space-x-4">
@@ -78,9 +81,12 @@
 
         <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100">
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-orange hover:bg-orange-50 rounded-md">Inicio</a>
-                <a href="#categorias" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Categorías</a>
-                <a href="#destacados" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-pink hover:bg-pink-50 rounded-md">Novedades</a>
+                <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Inicio</a>
+                <a href="#categorias" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-pink hover:bg-pink-50 rounded-md">Categorías</a>
+                <a href="#ofertas" class="block px-3 py-2 text-base font-bold text-brand-orange hover:bg-orange-50 rounded-md flex items-center gap-2">
+                    <i class="ph-fill ph-tag"></i> Ofertas
+                </a>
+                <a href="#destacados" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Novedades</a>
                 <button id="btn-abrir-login-movil" class="w-full text-left block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-orange hover:bg-orange-50 rounded-md">Mi Cuenta</button>
             </div>
         </div>
@@ -128,11 +134,24 @@
             </div>
         </section>
 
+        <section id="ofertas" class="py-16 bg-orange-50 hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-end mb-10">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Ofertas <span class="text-brand-orange">Especiales</span> <i class="ph-fill ph-fire text-brand-orange"></i></h2>
+                        <div class="w-24 h-1 bg-brand-orange rounded-full"></div>
+                    </div>
+                </div>
+                <div id="public-ofertas" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                    </div>
+            </div>
+        </section>
+
         <section id="destacados" class="py-16 bg-gray-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-end mb-10">
                     <div>
-                        <h2 class="text-3xl font-bold text-gray-800 mb-2">Lo Más <span class="text-brand-pink">Nuevo</span></h2>
+                        <h2 id="titulo-catalogo" class="text-3xl font-bold text-gray-800 mb-2">Lo Más <span class="text-brand-pink">Nuevo</span></h2>
                         <div class="w-24 h-1 bg-brand-blue rounded-full"></div>
                     </div>
                 </div>
