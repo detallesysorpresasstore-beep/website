@@ -11,6 +11,7 @@ const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 let currentUser = null;
 let currentUserData = null; 
 window.productosPublicos = []; 
+window.categoriasPublicas = []; // NUEVO: Para guardar las subcategorías
 let carritoCompras = []; 
 let subtotalGlobal = 0; 
 
@@ -424,9 +425,18 @@ async function cargarCategoriasPublicas() {
         if (querySnapshot.empty) { contenedor.innerHTML = '<p class="col-span-full text-center text-gray-500">Próximamente nuevas categorías.</p>'; return; }
         
         let htmlTemporal = '';
+        window.categoriasPublicas = []; // Reiniciamos arreglo global
+
         querySnapshot.forEach((docSnap) => {
             const cat = docSnap.data();
-            htmlTemporal += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 hover:border-brand-blue flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 text-brand-blue"></i><h3 class="font-semibold text-gray-700">${cat.nombre}</h3></a>`;
+            window.categoriasPublicas.push(cat); // Guardamos la categoría completa
+            
+            // INTELIGENCIA DE COLOR: Evaluamos si es de "niñas"
+            const esNina = cat.nombre.toLowerCase().includes('niña');
+            const colorBase = esNina ? 'text-brand-pink' : 'text-brand-blue';
+            const hoverColor = esNina ? 'hover:border-brand-pink' : 'hover:border-brand-blue';
+
+            htmlTemporal += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 ${hoverColor} flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 ${colorBase}"></i><h3 class="font-semibold text-gray-700">${cat.nombre}</h3></a>`;
         });
         contenedor.innerHTML = htmlTemporal;
     } catch (error) { console.error(error); }
@@ -478,6 +488,12 @@ function generarHtmlTarjetaProducto(prod) {
         `;
     }
 
+    // INTELIGENCIA DE COLOR: Etiqueta pequeña (solo rosada si implica niñas)
+    const catNom = (prod.categoria || "").toLowerCase();
+    const subCatNom = (prod.subcategoria || "").toLowerCase();
+    const esNina = catNom.includes('niña') || subCatNom.includes('niña');
+    const colorBadgeCat = esNina ? 'bg-pink-50 text-brand-pink' : 'bg-blue-50 text-brand-blue';
+
     return `
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md relative" onclick="abrirModalDetalle('${prod.id}')">
             ${badgeHTML}
@@ -490,7 +506,7 @@ function generarHtmlTarjetaProducto(prod) {
                 </div>
             </div>
             <div class="p-3 sm:p-5 flex flex-col flex-grow z-10">
-                <span class="text-[10px] sm:text-xs font-bold text-brand-blue uppercase tracking-wider mb-1 truncate">${prod.categoria}</span>
+                <span class="text-[10px] sm:text-xs font-bold ${colorBadgeCat} px-2 py-0.5 rounded w-max uppercase tracking-wider mb-2 truncate">${prod.categoria}</span>
                 <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
                 <div class="mt-auto flex items-center justify-between">
                     ${precioHTML}
@@ -529,21 +545,87 @@ function renderizarOfertas(listaOfertas) {
     contenedorOfertas.innerHTML = htmlTemporal;
 }
 
+// NUEVO: Función para generar los botones de subcategoría
 window.filtrarPorCategoria = (categoriaNombre) => {
     const filtrados = window.productosPublicos.filter(p => p.categoria === categoriaNombre);
     const tituloSeccion = document.getElementById('titulo-catalogo');
-    if (tituloSeccion) tituloSeccion.innerHTML = `Categoría: <span class="text-brand-pink">${categoriaNombre}</span> <button onclick="limpiarFiltros()" class="ml-4 align-middle text-sm bg-gray-100 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-full hover:bg-gray-200 transition-colors shadow-sm inline-flex items-center gap-1"><i class="ph ph-x"></i> Ver todo</button>`;
+    
+    // Validar color
+    const esNina = categoriaNombre.toLowerCase().includes('niña');
+    const colorTitulo = esNina ? 'text-brand-pink' : 'text-brand-blue';
+
+    if (tituloSeccion) {
+        tituloSeccion.innerHTML = `Categoría: <span class="${colorTitulo}">${categoriaNombre}</span> <button onclick="limpiarFiltros()" class="ml-4 align-middle text-sm bg-gray-100 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-full hover:bg-gray-200 transition-colors shadow-sm inline-flex items-center gap-1"><i class="ph ph-x"></i> Ver todo</button>`;
+    }
+    
     renderizarCatalogo(filtrados);
+
+    // LÓGICA DE BOTONES RÁPIDOS DE SUBCATEGORÍA
+    const contenedorSub = document.getElementById('filtros-subcategorias');
+    const catObj = window.categoriasPublicas.find(c => c.nombre === categoriaNombre);
+    
+    if (contenedorSub && catObj && catObj.subcategorias && catObj.subcategorias.length > 0) {
+        let subHtml = `<button onclick="filtrarPorCategoria('${categoriaNombre}')" class="px-4 py-2 rounded-full text-sm font-bold bg-gray-800 text-white shadow-sm transition-colors">Ver Todo</button>`;
+        
+        catObj.subcategorias.forEach(sub => {
+            const esSubNina = sub.toLowerCase().includes('niña') || esNina;
+            const hoverColor = esSubNina ? 'hover:bg-brand-pink hover:border-brand-pink' : 'hover:bg-brand-blue hover:border-brand-blue';
+            
+            subHtml += `<button onclick="filtrarPorSubcategoria('${categoriaNombre}', '${sub}')" class="px-4 py-2 rounded-full text-sm font-medium border bg-white text-gray-600 border-gray-200 ${hoverColor} hover:text-white transition-colors shadow-sm">${sub}</button>`;
+        });
+        
+        contenedorSub.innerHTML = subHtml;
+        contenedorSub.classList.remove('hidden');
+    } else if(contenedorSub) {
+        contenedorSub.classList.add('hidden');
+        contenedorSub.innerHTML = '';
+    }
+};
+
+window.filtrarPorSubcategoria = (categoriaNombre, subcategoriaNombre) => {
+    const filtrados = window.productosPublicos.filter(p => p.categoria === categoriaNombre && p.subcategoria === subcategoriaNombre);
+    renderizarCatalogo(filtrados);
+
+    // Actualizar el estado visual de los botones
+    const contenedorSub = document.getElementById('filtros-subcategorias');
+    if (contenedorSub) {
+        const botones = contenedorSub.querySelectorAll('button');
+        const esNina = categoriaNombre.toLowerCase().includes('niña') || subcategoriaNombre.toLowerCase().includes('niña');
+        const colorActivo = esNina ? 'bg-brand-pink' : 'bg-brand-blue';
+
+        botones.forEach(btn => {
+            if (btn.innerText === subcategoriaNombre) {
+                // Botón Seleccionado
+                btn.className = `px-4 py-2 rounded-full text-sm font-bold ${colorActivo} text-white shadow-sm transition-colors`;
+            } else if (btn.innerText === 'Ver Todo') {
+                // Botón "Ver Todo" apagado
+                btn.className = `px-4 py-2 rounded-full text-sm font-medium border bg-white text-gray-600 border-gray-200 hover:bg-gray-100 transition-colors shadow-sm`;
+            } else {
+                // Otros botones apagados
+                const esSubNina = btn.innerText.toLowerCase().includes('niña') || esNina;
+                const hoverColor = esSubNina ? 'hover:bg-brand-pink hover:border-brand-pink' : 'hover:bg-brand-blue hover:border-brand-blue';
+                btn.className = `px-4 py-2 rounded-full text-sm font-medium border bg-white text-gray-600 border-gray-200 ${hoverColor} hover:text-white transition-colors shadow-sm`;
+            }
+        });
+    }
 };
 
 window.limpiarFiltros = () => {
     const tituloSeccion = document.getElementById('titulo-catalogo');
-    if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-pink">Nuevo</span>`;
+    if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-orange">Nuevo</span>`;
+    
+    // Ocultar botones de subcategoría al limpiar
+    const contenedorSub = document.getElementById('filtros-subcategorias');
+    if(contenedorSub) {
+        contenedorSub.classList.add('hidden');
+        contenedorSub.innerHTML = '';
+    }
+
     renderizarCatalogo(window.productosPublicos);
 };
 
 // ==========================================
-// MÓDULO: SLIDER DINÁMICO (HERO) - AJUSTADO 5 SEGS / OBJECT-CONTAIN
+// MÓDULO: SLIDER DINÁMICO (HERO)
 // ==========================================
 window.diapositivasHero = [];
 let slideIndexActual = 0;
@@ -591,7 +673,7 @@ function iniciarSliderHero() {
 
     dibujarSlideHero();
     if(heroSliderInterval) clearInterval(heroSliderInterval);
-    heroSliderInterval = setInterval(siguienteSlideHero, 5000); // 5 SEGUNDOS
+    heroSliderInterval = setInterval(siguienteSlideHero, 5000); 
 }
 
 function dibujarSlideHero() {
@@ -599,9 +681,15 @@ function dibujarSlideHero() {
     if (!container || window.diapositivasHero.length === 0) return;
 
     const slide = window.diapositivasHero[slideIndexActual];
-    const colorEtiqueta = slide.tipo === 'promo' ? 'bg-brand-pink text-white' : 'bg-white text-brand-blue';
+    
+    // INTELIGENCIA DE COLOR:
+    let colorEtiqueta = 'bg-white text-brand-blue';
+    if(slide.tipo === 'promo') {
+        colorEtiqueta = 'bg-brand-orange text-white';
+    } else if (slide.etiqueta.toLowerCase().includes('niña') || slide.descripcion.toLowerCase().includes('niña')) {
+        colorEtiqueta = 'bg-brand-pink text-white';
+    }
 
-    // MODIFICADO: Contenedor con bg-white y object-contain para no distorsionar/recortar
     container.innerHTML = `
         <div class="absolute inset-0 w-full h-full cursor-pointer group animate-fade-in bg-white flex items-center justify-center" onclick="abrirModalDetalle('${slide.id}')">
             <img src="${slide.imagen}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-700">
@@ -690,7 +778,13 @@ function setupModalDetalle() {
         if(!prod) return;
         currentProductId = prod.id; 
 
+        // INTELIGENCIA DE COLOR
+        const esNina = (prod.categoria && prod.categoria.toLowerCase().includes('niña')) || (prod.subcategoria && prod.subcategoria.toLowerCase().includes('niña'));
+        const colorCat = esNina ? 'bg-pink-50 text-brand-pink' : 'bg-blue-50 text-brand-blue';
+
         document.getElementById('detalle-categoria').textContent = prod.categoria;
+        document.getElementById('detalle-categoria').className = `inline-block px-3 py-1 ${colorCat} font-bold text-xs rounded-full uppercase tracking-wider w-max`;
+        
         document.getElementById('detalle-subcategoria').textContent = prod.subcategoria || '';
         document.getElementById('detalle-nombre').textContent = prod.nombre;
         
@@ -701,7 +795,6 @@ function setupModalDetalle() {
         }
         
         document.getElementById('detalle-precio-bs').textContent = formatearMoneda(prod.precio, 'VES');
-        
         document.getElementById('detalle-descripcion').textContent = prod.descripcion || 'Este producto no tiene una descripción detallada.';
         
         const badge = document.getElementById('detalle-stock-badge');
