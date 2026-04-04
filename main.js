@@ -445,10 +445,9 @@ async function cargarProductosPublicos() {
             prod.imagenes = prod.imagenes || (prod.imagen ? [prod.imagen] : []);
             prod.stock = prod.stock !== undefined ? prod.stock : 10;
             
-            // LÓGICA DE OFERTAS: Calculamos el nuevo precio si tiene descuento
             if(prod.descuento && prod.descuento > 0) {
-                prod.precioOriginal = prod.precio; // Guardamos el viejo para mostrarlo tachado
-                prod.precio = prod.precio * (1 - (prod.descuento / 100)); // Precio matemático real
+                prod.precioOriginal = prod.precio; 
+                prod.precio = prod.precio * (1 - (prod.descuento / 100)); 
                 if(prod.stock > 0) listaOfertas.push(prod);
             }
 
@@ -456,11 +455,10 @@ async function cargarProductosPublicos() {
         });
 
         renderizarCatalogo(window.productosPublicos);
-        renderizarOfertas(listaOfertas); // Inyectamos las ofertas en su propia sección
+        renderizarOfertas(listaOfertas); 
     } catch (error) { console.error(error); }
 }
 
-// Función auxiliar para renderizar tarjetas de producto (Catálogo y Ofertas)
 function generarHtmlTarjetaProducto(prod) {
     const imgPortada = prod.imagenes.length > 0 ? prod.imagenes[0] : 'https://via.placeholder.com/300';
     let imgHTML = imgPortada.startsWith('http') 
@@ -470,7 +468,6 @@ function generarHtmlTarjetaProducto(prod) {
     let precioHTML = `<span class="text-base sm:text-2xl font-black text-gray-800">$${prod.precio.toFixed(2)}</span>`;
     let badgeHTML = '';
 
-    // Si tiene descuento, mostramos la etiqueta roja y el precio tachado
     if(prod.descuento && prod.descuento > 0) {
         badgeHTML = `<div class="absolute top-2 left-2 bg-red-500 text-white text-[10px] sm:text-xs font-black px-2 py-1 rounded-md shadow-md z-10">-${prod.descuento}%</div>`;
         precioHTML = `
@@ -546,7 +543,7 @@ window.limpiarFiltros = () => {
 };
 
 // ==========================================
-// MÓDULO: SLIDER DINÁMICO (HERO)
+// MÓDULO: SLIDER DINÁMICO (HERO) - AJUSTADO 5 SEGS / OBJECT-CONTAIN
 // ==========================================
 window.diapositivasHero = [];
 let slideIndexActual = 0;
@@ -594,7 +591,7 @@ function iniciarSliderHero() {
 
     dibujarSlideHero();
     if(heroSliderInterval) clearInterval(heroSliderInterval);
-    heroSliderInterval = setInterval(siguienteSlideHero, 4000);
+    heroSliderInterval = setInterval(siguienteSlideHero, 5000); // 5 SEGUNDOS
 }
 
 function dibujarSlideHero() {
@@ -604,11 +601,12 @@ function dibujarSlideHero() {
     const slide = window.diapositivasHero[slideIndexActual];
     const colorEtiqueta = slide.tipo === 'promo' ? 'bg-brand-pink text-white' : 'bg-white text-brand-blue';
 
+    // MODIFICADO: Contenedor con bg-white y object-contain para no distorsionar/recortar
     container.innerHTML = `
-        <div class="absolute inset-0 w-full h-full cursor-pointer group animate-fade-in" onclick="abrirModalDetalle('${slide.id}')">
-            <img src="${slide.imagen}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-90"></div>
-            <div class="absolute bottom-0 left-0 right-0 p-5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+        <div class="absolute inset-0 w-full h-full cursor-pointer group animate-fade-in bg-white flex items-center justify-center" onclick="abrirModalDetalle('${slide.id}')">
+            <img src="${slide.imagen}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-700">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-90 pointer-events-none"></div>
+            <div class="absolute bottom-0 left-0 right-0 p-5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 z-10">
                 <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2 shadow-sm ${colorEtiqueta}">
                     ${slide.etiqueta}
                 </span>
@@ -696,7 +694,6 @@ function setupModalDetalle() {
         document.getElementById('detalle-subcategoria').textContent = prod.subcategoria || '';
         document.getElementById('detalle-nombre').textContent = prod.nombre;
         
-        // MODIFICACIÓN: Mostrar precio tachado si hay descuento
         if(prod.descuento && prod.descuento > 0) {
             document.getElementById('detalle-precio').innerHTML = `<span class="text-gray-400 line-through text-xl mr-2">$${prod.precioOriginal.toFixed(2)}</span><span class="text-brand-orange">$${prod.precio.toFixed(2)}</span>`;
         } else {
