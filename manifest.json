@@ -1,0 +1,21 @@
+{
+  "name": "Detalles y Sorpresas STORE",
+  "short_name": "DyS Store",
+  "description": "Ropa para niños y juguetes mágicos.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4facfe",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192.png?text=DyS+Icon",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512.png?text=DyS+Icon",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
