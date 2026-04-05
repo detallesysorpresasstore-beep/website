@@ -11,7 +11,7 @@ const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
 let currentUser = null;
 let currentUserData = null; 
 window.productosPublicos = []; 
-window.categoriasPublicas = []; // NUEVO: Para guardar las subcategorías
+window.categoriasPublicas = []; // Para guardar las subcategorías
 let carritoCompras = []; 
 let subtotalGlobal = 0; 
 
@@ -44,7 +44,7 @@ async function initApp() {
     setupModalDetalle();
     setupCheckout(); 
     
-    verificarCarritoAbandonado(); // NUEVO: Activamos el radar de ventas perdidas
+    verificarCarritoAbandonado(); // Activamos el radar de ventas perdidas
 }
 
 // ==========================================
@@ -576,7 +576,7 @@ function renderizarOfertas(listaOfertas) {
     contenedorOfertas.innerHTML = htmlTemporal;
 }
 
-// NUEVO: Función para generar los botones de subcategoría
+// Función para generar los botones de subcategoría
 window.filtrarPorCategoria = (categoriaNombre) => {
     const filtrados = window.productosPublicos.filter(p => p.categoria === categoriaNombre);
     const tituloSeccion = document.getElementById('titulo-catalogo');
@@ -719,6 +719,12 @@ function dibujarSlideHero() {
         colorEtiqueta = 'bg-brand-orange text-white';
     } else if (slide.etiqueta.toLowerCase().includes('niña') || slide.descripcion.toLowerCase().includes('niña')) {
         colorEtiqueta = 'bg-brand-pink text-white';
+    }
+
+    // NUEVO: Actualizar la "sombra" de color dinámica (Glow)
+    const heroGlow = document.getElementById('hero-glow');
+    if (heroGlow) {
+        heroGlow.style.backgroundImage = `url('${slide.imagen}')`;
     }
 
     // AQUI SE APLICÓ LA SOLUCIÓN DEL HEIGHT COLLAPSE (Cambiamos absolute inset-0 por relative)
