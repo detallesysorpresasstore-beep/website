@@ -94,7 +94,7 @@ async function cargarPromocionesPublicas() {
 }
 
 function formatearMoneda(montoUSD, moneda) {
-    if (moneda === 'VES') return `Bs. ${(montoUSD * configuracionTienda.tasaBcv).toFixed(2)}`;
+    if (moneda === 'VES') return `Bs. ${(montoUSD * configuracionTienda.tasaBcv).toFixed(2)} (BCV)`;
     if (moneda === 'COP') return `$ ${(montoUSD * configuracionTienda.tasaCop).toFixed(2)} COP`;
     return `$${montoUSD.toFixed(2)}`;
 }
@@ -1017,7 +1017,7 @@ function renderizarCarrito() {
     if (carritoCompras.length === 0) {
         contenedor.innerHTML = `<div class="text-center text-gray-400 mt-10"><i class="ph-duotone ph-shopping-bag text-6xl mb-3 text-gray-300"></i><p>Tu carrito está vacío</p><button id="btn-seguir-vacio" class="mt-4 text-brand-blue font-bold hover:underline">Ir a comprar</button></div>`;
         badge.textContent = '0'; badge.classList.add('hidden');
-        txtTotal.textContent = '$0.00'; if(txtTotalBs) txtTotalBs.textContent = 'Bs. 0.00'; btnPago.disabled = true;
+        txtTotal.textContent = '$0.00'; if(txtTotalBs) txtTotalBs.textContent = 'Bs. 0.00 (BCV)'; btnPago.disabled = true;
         setTimeout(() => {
             const btnSeguir = document.getElementById('btn-seguir-vacio');
             if(btnSeguir) btnSeguir.addEventListener('click', () => { document.getElementById('cart-sidebar').classList.add('translate-x-full'); document.getElementById('cart-overlay').classList.add('hidden'); });
