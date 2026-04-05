@@ -700,8 +700,9 @@ function dibujarSlideHero() {
         colorEtiqueta = 'bg-brand-pink text-white';
     }
 
+    // AQUI SE APLICÓ LA SOLUCIÓN DEL HEIGHT COLLAPSE (Cambiamos absolute inset-0 por relative)
     container.innerHTML = `
-        <div class="absolute inset-0 w-full h-full cursor-pointer group animate-fade-in bg-white flex items-center justify-center" onclick="abrirModalDetalle('${slide.id}')">
+        <div class="relative w-full h-full cursor-pointer group animate-fade-in bg-white flex items-center justify-center" onclick="abrirModalDetalle('${slide.id}')">
             <img src="${slide.imagen}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-700">
             <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-90 pointer-events-none"></div>
             <div class="absolute bottom-0 left-0 right-0 p-5 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300 z-10">
