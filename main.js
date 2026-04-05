@@ -106,7 +106,28 @@ function formatearMoneda(montoUSD, moneda) {
 function setupMobileMenu() {
     const btn = document.getElementById('mobile-menu-btn');
     const menu = document.getElementById('mobile-menu');
-    if(btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'));
+    
+    if(btn && menu) {
+        // Abrir/Cerrar al presionar el botón de hamburguesa
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evita que el clic cierre el menú inmediatamente
+            menu.classList.toggle('hidden');
+        });
+
+        // Cerrar el menú si se hace clic en cualquier enlace o botón dentro de él
+        menu.querySelectorAll('a, button').forEach(link => {
+            link.addEventListener('click', () => {
+                menu.classList.add('hidden');
+            });
+        });
+
+        // Cerrar el menú si se hace clic fuera de él (en el resto de la página)
+        document.addEventListener('click', (e) => {
+            if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== btn) {
+                menu.classList.add('hidden');
+            }
+        });
+    }
 }
 
 function monitorAuthState() {
