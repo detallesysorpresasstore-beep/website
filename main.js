@@ -21,6 +21,55 @@ function sanitize(str) {
     return div.innerHTML;
 }
 
+
+// ==========================================
+// SISTEMA DE NOTIFICACIONES (reemplaza alert/confirm nativos)
+// ==========================================
+function showToast(mensaje, tipo = 'info', duracion = 4000) {
+    const colores = {
+        success: 'border-green-500 bg-green-50 text-green-800',
+        error:   'border-red-500 bg-red-50 text-red-800',
+        warning: 'border-brand-orange bg-orange-50 text-orange-800',
+        info:    'border-brand-blue bg-blue-50 text-blue-800'
+    };
+    const iconos = {
+        success: 'ph-fill ph-check-circle text-green-500',
+        error:   'ph-fill ph-warning-circle text-red-500',
+        warning: 'ph-fill ph-warning text-brand-orange',
+        info:    'ph-fill ph-info text-brand-blue'
+    };
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-start gap-3 px-5 py-4 rounded-2xl shadow-2xl border-l-4 ${colores[tipo]} max-w-sm w-[90vw] transition-all duration-300 translate-y-4 opacity-0`;
+    toast.innerHTML = `<i class="${iconos[tipo]} text-xl shrink-0 mt-0.5"></i><p class="text-sm font-medium leading-snug">${mensaje}</p>`;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.classList.remove('translate-y-4','opacity-0'); });
+    setTimeout(() => {
+        toast.classList.add('translate-y-4','opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, duracion);
+}
+
+function showConfirm(mensaje, onConfirm, textoBtn = 'Confirmar', tipoPeligroso = false) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-[998] flex items-center justify-center p-4 backdrop-blur-sm';
+    const colorBtn = tipoPeligroso ? 'bg-red-500 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-500';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div class="flex items-start gap-3">
+                <i class="ph-fill ph-${tipoPeligroso ? 'warning-circle text-red-500' : 'question text-brand-orange'} text-2xl shrink-0 mt-0.5"></i>
+                <p class="text-gray-700 font-medium leading-snug">${mensaje}</p>
+            </div>
+            <div class="flex justify-end gap-3 mt-2">
+                <button id="confirm-cancel" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+                <button id="confirm-ok" class="${colorBtn} text-white font-bold px-4 py-2 rounded-lg transition-colors shadow-sm">${textoBtn}</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#confirm-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#confirm-ok').onclick = () => { overlay.remove(); onConfirm(); };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
 let currentUser = null;
 let currentUserData = null; 
 window.productosPublicos = []; 
@@ -216,10 +265,7 @@ function setupLoginModal() {
     if(btnCerrarPerfil) btnCerrarPerfil.addEventListener('click', () => modalPerfil.classList.add('hidden'));
     if(btnCerrarSesionPerfil) {
         btnCerrarSesionPerfil.addEventListener('click', async () => {
-            if(confirm("¿Seguro que deseas cerrar tu sesión?")) {
-                await signOut(auth);
-                window.location.reload();
-            }
+            showConfirm("¿Seguro que deseas cerrar tu sesión?", async () => { await signOut(auth); window.location.reload(); })
         });
     }
 
@@ -303,13 +349,18 @@ function setupLoginModal() {
 
                         document.getElementById('modal-checkout').classList.remove('hidden');
                     } else {
-                        window.location.reload(); 
+                        // Actualizar UI sin recargar página
+                        if(btnLoginIcon) { btnLoginIcon.classList.remove('ph'); btnLoginIcon.classList.add('text-brand-orange', 'ph-fill'); }
+                        if(btnLoginMovil) btnLoginMovil.textContent = "Mi Perfil";
+                        modal.classList.add('hidden');
+                        form.reset();
+                        showToast(`¡Bienvenido, ${currentUserData?.name || ''}! 👋`, 'success');
                     }
                 }, 1000);
 
             } catch (error) {
                 console.error("Error en Auth:", error);
-                loginError.classList.remove('hidden'); loginError.textContent = 'Error: Verifica tus credenciales o conexión.';
+                showToast('Correo o contraseña incorrectos. Intenta de nuevo.', 'error');
             } finally { 
                 btnSubmit.disabled = false; btnSubmit.innerHTML = originalText; 
             }
@@ -375,7 +426,7 @@ function setupPerfilEdicion() {
                 vistaDatos.classList.remove('hidden');
             } catch(err) {
                 console.error("Error actualizando perfil:", err);
-                alert("Ocurrió un error al guardar tus datos.");
+                showToast("Ocurrió un error al guardar tus datos.", "error");
             } finally {
                 btnGuardar.disabled = false;
                 btnGuardar.innerHTML = '<i class="ph-bold ph-floppy-disk"></i> Guardar';
@@ -977,10 +1028,10 @@ window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
 
     const itemExistente = carritoCompras.find(item => item.id === idProducto);
     if (itemExistente) {
-        if(itemExistente.cantidad + cantidadAgregada > productoBase.stock) { alert(`No puedes añadir más. Solo tenemos ${productoBase.stock} unidades.`); return; }
+        if(itemExistente.cantidad + cantidadAgregada > productoBase.stock) { showToast(`Solo tenemos ${productoBase.stock} unidades disponibles.`, "warning"); return; }
         itemExistente.cantidad += cantidadAgregada;
     } else {
-        if(cantidadAgregada > productoBase.stock) { alert(`Stock insuficiente. Solo quedan ${productoBase.stock} unidades.`); return; }
+        if(cantidadAgregada > productoBase.stock) { showToast(`Stock insuficiente. Solo quedan ${productoBase.stock} unidades.`, "warning"); return; }
         carritoCompras.push({
             id: productoBase.id, 
             productoOriginalId: productoBase.id,
@@ -1009,7 +1060,7 @@ window.modificarCantidadCarrito = (idProducto, delta) => {
 
     const nuevaCantidad = item.cantidad + delta;
     if(nuevaCantidad <= 0) { eliminarDelCarrito(idProducto); return; }
-    if(nuevaCantidad > item.stockMaximo) { alert("Haz alcanzado el límite de stock para este producto."); return; }
+    if(nuevaCantidad > item.stockMaximo) { showToast("Has alcanzado el límite de stock para este producto.", "warning"); return; }
     item.cantidad = nuevaCantidad; guardarCarritoLocal();
 };
 
@@ -1149,7 +1200,7 @@ function setupCheckout() {
         btnProcesar.addEventListener('click', () => {
             if(!currentUser) {
                 if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
-                alert("🔒 Para continuar con el pago necesitamos que inicies sesión o registres tu cuenta. ¡Es rápido y muy fácil!");
+                showToast("Inicia sesión para continuar con tu compra.", "info");
                 document.getElementById('login-mensaje-checkout').classList.remove('hidden');
                 document.getElementById('modal-login').classList.remove('hidden');
                 return;
@@ -1266,8 +1317,8 @@ function setupCheckout() {
             const referencia = inputReferencia.value.trim();
             const metodoConfig = metodosPagoPublicos.find(m => m.id === metodoId);
 
-            if (!metodoConfig) return alert("Selecciona un método de pago válido.");
-            if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return alert("Debes subir la foto (capture) del pago.");
+            if (!metodoConfig) return showToast("Selecciona un método de pago válido.", "warning");
+            if (metodoConfig.requisitos === 'ambos' && urlComprobantePago === '') return showToast("Debes subir la foto (capture) del pago.", "warning");
 
             const originalText = btnConfirmar.innerHTML;
             btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Asegurando Inventario...';
@@ -1382,16 +1433,18 @@ function setupCheckout() {
                 carritoCompras = []; guardarCarritoLocal(); urlComprobantePago = '';
                 
                 if (numeroWa) {
-                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito. Presiona 'Aceptar' para ir a WhatsApp y confirmar tu envío.");
+                    showToast("¡Pedido registrado! Serás redirigido a WhatsApp.", "success");
                     window.location.href = `https://wa.me/${numeroWa}?text=${encodedMensaje}`;
                 } else {
-                    alert("¡Gracias por tu compra! Tu pedido ha sido registrado con éxito.");
-                    cerrarCheckout(); window.location.reload(); 
+                    showToast("¡Pedido registrado con éxito! Gracias por tu compra.", "success");
+                    cerrarCheckout();
+                    showToast("¡Pedido registrado con éxito! Gracias por tu compra.", "success");
+                    carritoCompras = []; guardarCarritoLocal(); 
                 }
 
             } catch (error) {
                 console.error("Transacción abortada:", error); 
-                alert(error.message || "Ocurrió un error al procesar tu pedido. Por favor revisa tu carrito.");
+                showToast(error.message || "Ocurrió un error al procesar tu pedido.", "error");
                 btnConfirmar.disabled = false; btnConfirmar.innerHTML = originalText;
             }
         });
