@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> <title>Detalles y Sorpresas STORE | Ropa y Juguetes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Detalles y Sorpresas STORE | Ropa y Juguetes</title>
     
     <link rel="icon" type="image/png" href="./logo.png">
 
@@ -14,13 +14,13 @@
     
     <meta property="og:title" content="Detalles y Sorpresas STORE | Ropa y Juguetes Mágicos">
     <meta property="og:description" content="Descubre nuestra increíble colección llena de color, diversión y comodidad para los más pequeños. ¡Compra online!">
-    <meta property="og:image" content="https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80">
-    <meta property="og:url" content="https://tudominio.com"> <meta property="og:type" content="website">
+    <meta property="og:image" content="https://detallesysorpresasstore-beep.github.io/website/logo.png">
+    <meta property="og:url" content="https://detallesysorpresasstore-beep.github.io/website/"> <meta property="og:type" content="website">
     
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Detalles y Sorpresas STORE">
     <meta name="twitter:description" content="Ropa para niños y juguetes mágicos. ¡Haz que cada día sea una aventura!">
-    <meta name="twitter:image" content="https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80">
+    <meta name="twitter:image" content="https://detallesysorpresasstore-beep.github.io/website/logo.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -540,5 +540,14 @@
     </script>
 
     <script type="module" src="main.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registrado:', reg.scope))
+                    .catch(err => console.warn('SW no pudo registrarse:', err));
+            });
+        }
+    </script>
 </body>
 </html>
