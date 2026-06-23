@@ -6,7 +6,7 @@ import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
 import { collection, addDoc, getDocs, onSnapshot, deleteDoc, doc, updateDoc, getDoc, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // NOTA: Rotar esta clave en imgbb.com/account/settings y usar una Cloud Function como proxy.
-const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
+const IMGBB_API_KEY = 'be437e8baf8925c075326d5b9ca91016';
 
 // ==========================================
 // SEGURIDAD: Sanitización contra XSS
