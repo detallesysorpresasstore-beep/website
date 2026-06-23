@@ -5,7 +5,18 @@
 import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// NOTA: Rotar esta clave en imgbb.com/account/settings y usar una Cloud Function como proxy.
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
+
+// ==========================================
+// SEGURIDAD: Sanitización contra XSS
+// ==========================================
+function sanitize(str) {
+    if (str === null || str === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
 
 // ==========================================
 // REFERENCIAS DEL DOM
@@ -108,8 +119,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function verificarSeguridad() {
-    onAuthStateChanged(auth, (user) => {
-        if (!user) window.location.href = 'index.html';
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+        try {
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+                await signOut(auth);
+                window.location.href = 'index.html';
+            }
+        } catch (error) {
+            console.error("Error verificando rol de administrador:", error);
+            window.location.href = 'index.html';
+        }
     });
 }
 
@@ -328,7 +352,7 @@ async function cargarPagos() {
 
             htmlTemporal += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4 font-medium text-gray-800">${p.nombre}</td>
+                    <td class="p-4 font-medium text-gray-800">${sanitize(p.nombre)}</td>
                     <td class="p-4"><span class="bg-blue-50 text-brand-blue border border-blue-200 px-2 py-1 rounded text-xs font-bold">${p.moneda}</span></td>
                     <td class="p-4">${badgeDescuento}</td>
                     <td class="p-4 text-center">
@@ -465,7 +489,7 @@ async function cargarPromociones() {
 
             htmlTemporal += `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-4 font-medium text-gray-800">${p.nombre}</td>
+                    <td class="p-4 font-medium text-gray-800">${sanitize(p.nombre)}</td>
                     <td class="p-4 text-sm text-gray-600">${condicionText}</td>
                     <td class="p-4 text-sm text-gray-600">${ofertaText}</td>
                     <td class="p-4 text-center">
@@ -631,7 +655,7 @@ function dibujarTablaOfertas() {
                 <td class="p-4">
                     <div class="flex items-center gap-3">
                         <img src="${imgPortada}" class="h-10 w-10 rounded-lg object-cover border border-gray-200">
-                        <span class="font-medium text-gray-800 line-clamp-1">${p.nombre}</span>
+                        <span class="font-medium text-gray-800 line-clamp-1">${sanitize(p.nombre)}</span>
                     </div>
                 </td>
                 <td class="p-4 font-bold text-gray-400 line-through">$${precioOriginal.toFixed(2)}</td>
@@ -692,7 +716,7 @@ function dibujarTablaCategorias(arreglo) {
     let htmlTemporal = '';
     arreglo.forEach(cat => {
         const subcatsTexto = (cat.subcategorias && cat.subcategorias.length > 0) ? cat.subcategorias.map(s => `<span class="inline-block bg-gray-100 px-2 py-1 rounded text-xs mr-1 mb-1">${s}</span>`).join('') : '<span class="text-gray-400 italic">Sin subcategorías</span>';
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${cat.nombre}</td><td class="p-4 text-gray-600">${subcatsTexto}</td><td class="p-4 text-gray-500"><i class="${cat.icono} text-xl text-brand-orange mr-2"></i> ${cat.icono}</td><td class="p-4 text-center"><button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${sanitize(cat.nombre)}</td><td class="p-4 text-gray-600">${subcatsTexto}</td><td class="p-4 text-gray-500"><i class="${sanitize(cat.icono)} text-xl text-brand-orange mr-2"></i> ${sanitize(cat.icono)}</td><td class="p-4 text-center"><button onclick="eliminarCategoria('${cat.id}')" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
@@ -803,7 +827,7 @@ function dibujarTablaProductos(arreglo) {
         
         const etiquetaOferta = (prod.descuento && prod.descuento > 0) ? `<br><span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold mt-1 inline-block">-${prod.descuento}% OFF</span>` : '';
 
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${prod.nombre}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${prod.categoria}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${prod.subcategoria}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${sanitize(prod.nombre)}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${sanitize(prod.categoria)}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${sanitize(prod.subcategoria)}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
@@ -849,7 +873,7 @@ function dibujarTablaClientes(arreglo) {
         const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
         const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
         const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${user.name || 'Sin Nombre'}</td><td class="p-4 text-gray-600">${user.email}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${sanitize(user.name || 'Sin Nombre')}</td><td class="p-4 text-gray-600">${sanitize(user.email)}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
@@ -895,9 +919,9 @@ function dibujarTablaPedidos(arreglo) {
         <tr class="border-b border-gray-100 hover:bg-gray-50">
             <td class="p-4 font-mono text-sm text-gray-500">#${pedido.id.slice(-6).toUpperCase()}</td>
             <td class="p-4 text-sm text-gray-600 font-medium">${fechaFormateada}</td>
-            <td class="p-4 font-medium text-gray-800">${pedido.clienteNombre}</td>
+            <td class="p-4 font-medium text-gray-800">${sanitize(pedido.clienteNombre)}</td>
             <td class="p-4 font-bold text-gray-800">$${pedido.totalUSD ? pedido.totalUSD.toFixed(2) : (pedido.total || 0).toFixed(2)}</td>
-            <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${pedido.estado}</span></td>
+            <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold ${colorEstado}">${sanitize(pedido.estado)}</span></td>
             <td class="p-4 text-center"><button onclick="abrirModalPedido('${pedido.id}')" class="text-brand-blue hover:text-blue-700 bg-blue-50 px-3 py-1 rounded-lg text-sm font-medium transition-colors">Ver / Editar</button></td>
         </tr>`;
     });
@@ -912,12 +936,12 @@ window.abrirModalPedido = (id) => {
     document.getElementById('ped-id-display').textContent = `#${id.slice(-6).toUpperCase()}`;
     document.getElementById('ped-estado').value = pedido.estado; 
     
-    document.getElementById('ped-cliente-nombre').textContent = pedido.clienteNombre || 'Sin nombre';
-    document.getElementById('ped-cliente-email').textContent = pedido.clienteEmail || 'Sin email';
-    document.getElementById('ped-cliente-direccion').textContent = pedido.direccion || 'Sin dirección';
+    document.getElementById('ped-cliente-nombre').textContent = sanitize(pedido.clienteNombre || 'Sin nombre');
+    document.getElementById('ped-cliente-email').textContent = sanitize(pedido.clienteEmail || 'Sin email');
+    document.getElementById('ped-cliente-direccion').textContent = sanitize(pedido.direccion || 'Sin dirección');
 
-    document.getElementById('ped-pago-metodo').textContent = pedido.metodoPago || 'No especificado';
-    document.getElementById('ped-pago-referencia').textContent = pedido.referencia || 'N/A';
+    document.getElementById('ped-pago-metodo').textContent = sanitize(pedido.metodoPago || 'No especificado');
+    document.getElementById('ped-pago-referencia').textContent = sanitize(pedido.referencia || 'N/A');
 
     const contComprobante = document.getElementById('ped-contenedor-comprobante');
     const imgComprobante = document.getElementById('ped-img-comprobante');
@@ -944,7 +968,7 @@ window.abrirModalPedido = (id) => {
                 <li class="flex items-center gap-3 bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
                     <img src="${img}" class="w-12 h-12 rounded object-cover border border-gray-200">
                     <div class="flex-1">
-                        <p class="text-sm font-bold text-gray-800 line-clamp-1">${prod.nombre}</p>
+                        <p class="text-sm font-bold text-gray-800 line-clamp-1">${sanitize(prod.nombre)}</p>
                         <p class="text-xs text-gray-500">${prod.cantidad} und(s) x <span class="text-gray-800 font-bold">$${prod.precio.toFixed(2)}</span></p>
                     </div>
                     <div class="text-right">
