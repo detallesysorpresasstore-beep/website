@@ -6,7 +6,20 @@ import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } fro
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+// NOTA: Rotar esta clave en imgbb.com/account/settings y usar una Cloud Function como proxy.
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
+
+// ==========================================
+// SEGURIDAD: Sanitización contra XSS
+// Escapa caracteres HTML peligrosos en cualquier dato
+// que provenga de Firestore antes de inyectarlo al DOM.
+// ==========================================
+function sanitize(str) {
+    if (str === null || str === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
 
 let currentUser = null;
 let currentUserData = null; 
@@ -424,13 +437,13 @@ window.cargarPerfilUsuario = async () => {
                     <div>
                         <div class="flex items-center gap-2 mb-1">
                             <span class="font-bold text-gray-800 text-sm">Orden #${pedido.id.slice(-6).toUpperCase()}</span>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorEstado}">${pedido.estado}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorEstado}">${sanitize(pedido.estado)}</span>
                         </div>
                         <p class="text-xs text-gray-500"><i class="ph-fill ph-calendar-blank text-gray-400"></i> ${fechaF} <span class="mx-1">•</span> <i class="ph-fill ph-package text-gray-400"></i> ${cantItems} producto(s)</p>
                     </div>
                     <div class="text-left sm:text-right">
                         <p class="font-black text-gray-800 text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${pedido.metodoPago}</p>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${sanitize(pedido.metodoPago)}</p>
                     </div>
                 </li>
             `;
@@ -467,7 +480,7 @@ async function cargarCategoriasPublicas() {
             const colorBase = esNina ? 'text-brand-pink' : 'text-brand-blue';
             const hoverColor = esNina ? 'hover:border-brand-pink' : 'hover:border-brand-blue';
 
-            htmlTemporal += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 ${hoverColor} flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 ${colorBase}"></i><h3 class="font-semibold text-gray-700">${cat.nombre}</h3></a>`;
+            htmlTemporal += `<a href="#destacados" onclick="filtrarPorCategoria('${cat.nombre}')" class="category-card block p-6 bg-white rounded-3xl transition-all duration-300 border border-gray-100 ${hoverColor} flex flex-col items-center justify-center"><i class="${cat.icono} text-5xl mb-3 ${colorBase}"></i><h3 class="font-semibold text-gray-700">${sanitize(cat.nombre)}</h3></a>`;
         });
         contenedor.innerHTML = htmlTemporal;
     } catch (error) { console.error(error); }
@@ -537,8 +550,8 @@ function generarHtmlTarjetaProducto(prod) {
                 </div>
             </div>
             <div class="p-3 sm:p-5 flex flex-col flex-grow z-10">
-                <span class="text-[10px] sm:text-xs font-bold ${colorBadgeCat} px-2 py-0.5 rounded w-max uppercase tracking-wider mb-2 truncate">${prod.categoria}</span>
-                <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${prod.nombre}</h3>
+                <span class="text-[10px] sm:text-xs font-bold ${colorBadgeCat} px-2 py-0.5 rounded w-max uppercase tracking-wider mb-2 truncate">${sanitize(prod.categoria)}</span>
+                <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${sanitize(prod.nombre)}</h3>
                 <div class="mt-auto flex items-center justify-between">
                     ${precioHTML}
                     <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
@@ -1037,7 +1050,7 @@ function renderizarCarrito() {
         <div class="flex items-center gap-4 ${estiloOferta} p-3 rounded-xl shadow-sm relative">
             <img src="${item.imagen}" class="w-20 h-20 object-cover rounded-lg bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${idReal}')" title="Ver detalles">
             <div class="flex-1">
-                <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${idReal}')">${item.nombre}</h4>
+                <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight mb-1 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${idReal}')">${sanitize(item.nombre)}</h4>
                 <p class="text-gray-800 font-bold">$${item.precio.toFixed(2)}</p>
                 <div class="flex items-center gap-3 mt-2">
                     <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
@@ -1087,7 +1100,7 @@ function renderizarCarrito() {
                         <div class="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-100 mt-3">
                             <img src="${prodOferta.imagenes[0]}" class="w-16 h-16 object-cover rounded-md border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity" onclick="abrirModalDetalle('${prodOferta.id}')" title="Ver detalles">
                             <div class="flex-1">
-                                <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${prodOferta.id}')">${prodOferta.nombre}</h4>
+                                <h4 class="font-bold text-gray-800 text-sm leading-tight line-clamp-2 cursor-pointer hover:text-brand-orange transition-colors" onclick="abrirModalDetalle('${prodOferta.id}')">${sanitize(prodOferta.nombre)}</h4>
                                 <div class="flex items-baseline gap-2 mt-1">
                                     <span class="text-xs text-gray-400 line-through">$${prodOferta.precioOriginal ? prodOferta.precioOriginal.toFixed(2) : prodOferta.precio.toFixed(2)}</span>
                                     <span class="text-lg font-black text-brand-blue">$${precioConDescuento.toFixed(2)}</span>
@@ -1198,16 +1211,42 @@ function setupCheckout() {
 
     if (inputComprobante) {
         inputComprobante.addEventListener('change', async (event) => {
-            const file = event.target.files[0]; if (!file) return;
-            textoComprobante.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Subiendo...'; btnConfirmar.disabled = true; 
+            const file = event.target.files[0]; 
+            if (!file) return;
+
+            // Validar tamaño máximo: 5MB
+            const MAX_SIZE_MB = 5;
+            if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+                textoComprobante.innerHTML = `<i class="ph-fill ph-warning-circle text-red-500"></i> La imagen supera los ${MAX_SIZE_MB}MB`;
+                inputComprobante.value = '';
+                return;
+            }
+
+            // Validar tipo MIME real (no solo la extensión del atributo accept)
+            const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            if (!TIPOS_PERMITIDOS.includes(file.type)) {
+                textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Solo se permiten imágenes (JPG, PNG, WEBP)';
+                inputComprobante.value = '';
+                return;
+            }
+
+            textoComprobante.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Subiendo...'; 
+            btnConfirmar.disabled = true; 
             try {
-                const formData = new FormData(); formData.append('image', file);
+                const formData = new FormData(); 
+                formData.append('image', file);
                 const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
                 const data = await response.json();
-                if (data.success) { urlComprobantePago = data.data.url; textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; }
-                else throw new Error("Error ImgBB");
-            } catch (error) { textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error (Img pesada)'; inputComprobante.value = ''; } 
-            finally { btnConfirmar.disabled = false; }
+                if (data.success) { 
+                    urlComprobantePago = data.data.url; 
+                    textoComprobante.innerHTML = '<i class="ph-fill ph-check-circle text-green-500"></i> Capture Cargado'; 
+                } else throw new Error("Error ImgBB");
+            } catch (error) { 
+                textoComprobante.innerHTML = '<i class="ph-fill ph-warning-circle text-red-500"></i> Error al subir, intenta de nuevo'; 
+                inputComprobante.value = ''; 
+            } finally { 
+                btnConfirmar.disabled = false; 
+            }
         });
     }
 
@@ -1233,31 +1272,16 @@ function setupCheckout() {
             const originalText = btnConfirmar.innerHTML;
             btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Asegurando Inventario...';
 
-            let totalFinalUSD = subtotalGlobal;
-            if(metodoConfig.descuento > 0) totalFinalUSD = subtotalGlobal * (1 - (metodoConfig.descuento / 100));
-
-            const orderData = {
-                clienteId: currentUser.uid,
-                clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
-                clienteEmail: currentUser.email,
-                direccion: direccion,
-                metodoPago: metodoConfig.nombre, 
-                referencia: referencia || 'N/A',
-                comprobanteUrl: urlComprobantePago, 
-                productos: carritoCompras, 
-                totalUSD: totalFinalUSD,
-                monedaSecundaria: metodoConfig.moneda,
-                totalSecundario: metodoConfig.moneda === 'VES' ? parseFloat((totalFinalUSD * configuracionTienda.tasaBcv).toFixed(2)) : (metodoConfig.moneda === 'COP' ? parseFloat((totalFinalUSD * configuracionTienda.tasaCop).toFixed(2)) : 0),
-                estado: 'Pendiente',
-                fecha: new Date().toISOString()
-            };
-
             let nuevaOrderRefID = '';
 
             try {
                 await runTransaction(db, async (transaction) => {
                     let productosActualizar = [];
+                    let productosVerificados = [];
+                    let totalVerificadoUSD = 0;
 
+                    // SEGURIDAD: Verificar stock Y precios desde Firestore.
+                    // Nunca confiar en el precio del localStorage del cliente.
                     for (const item of carritoCompras) {
                         const idRealBaseDB = item.productoOriginalId || item.id;
                         const prodRef = doc(db, "products", idRealBaseDB);
@@ -1266,11 +1290,29 @@ function setupCheckout() {
                         if (!prodSnap.exists()) {
                             throw new Error(`El producto "${item.nombre}" ya no está en la tienda.`);
                         }
-                        
-                        const stockActual = prodSnap.data().stock;
+
+                        const datosReales = prodSnap.data();
+                        const stockActual = datosReales.stock;
                         if (stockActual < item.cantidad) {
                             throw new Error(`¡Uy! Alguien más acaba de llevarse el último "${item.nombre}". Solo quedan ${stockActual} unidades.`);
                         }
+
+                        // Precio real desde Firestore, aplicando descuento si existe
+                        let precioReal = datosReales.precio;
+                        if (datosReales.descuento && datosReales.descuento > 0) {
+                            precioReal = precioReal * (1 - (datosReales.descuento / 100));
+                        }
+
+                        totalVerificadoUSD += precioReal * item.cantidad;
+
+                        productosVerificados.push({
+                            id: idRealBaseDB,
+                            productoOriginalId: idRealBaseDB,
+                            nombre: datosReales.nombre,
+                            precio: parseFloat(precioReal.toFixed(2)),
+                            imagen: item.imagen,
+                            cantidad: item.cantidad
+                        });
 
                         productosActualizar.push({
                             ref: prodRef,
@@ -1278,33 +1320,60 @@ function setupCheckout() {
                         });
                     }
 
+                    // Aplicar descuento del método de pago sobre el total verificado
+                    let totalFinalUSD = totalVerificadoUSD;
+                    if (metodoConfig.descuento > 0) {
+                        totalFinalUSD = totalVerificadoUSD * (1 - (metodoConfig.descuento / 100));
+                    }
+                    totalFinalUSD = parseFloat(totalFinalUSD.toFixed(2));
+
+                    const orderData = {
+                        clienteId: currentUser.uid,
+                        clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
+                        clienteEmail: currentUser.email,
+                        direccion: direccion,
+                        metodoPago: metodoConfig.nombre,
+                        referencia: referencia || 'N/A',
+                        comprobanteUrl: urlComprobantePago,
+                        productos: productosVerificados,
+                        totalUSD: totalFinalUSD,
+                        monedaSecundaria: metodoConfig.moneda,
+                        totalSecundario: metodoConfig.moneda === 'VES' ? parseFloat((totalFinalUSD * configuracionTienda.tasaBcv).toFixed(2)) : (metodoConfig.moneda === 'COP' ? parseFloat((totalFinalUSD * configuracionTienda.tasaCop).toFixed(2)) : 0),
+                        estado: 'Pendiente',
+                        fecha: new Date().toISOString()
+                    };
+
                     for (const prod of productosActualizar) {
                         transaction.update(prod.ref, { stock: prod.nuevoStock });
                     }
 
-                    const newOrderRef = doc(collection(db, "orders")); 
+                    const newOrderRef = doc(collection(db, "orders"));
                     transaction.set(newOrderRef, orderData);
-                    nuevaOrderRefID = newOrderRef.id; 
+                    nuevaOrderRefID = newOrderRef.id;
+
+                    // Exponer orderData al scope externo para el mensaje de WhatsApp
+                    window._lastOrderData = orderData;
                 });
 
+                const orderData = window._lastOrderData;
                 let mensajeWa = `¡Hola Detalles y Sorpresas! Acabo de registrar mi pedido en la web.\n\n`;
                 mensajeWa += `*Orden:* #${nuevaOrderRefID.slice(-6).toUpperCase()}\n`;
                 mensajeWa += `*Nombre:* ${orderData.clienteNombre}\n`;
                 mensajeWa += `*Correo:* ${orderData.clienteEmail}\n`;
                 mensajeWa += `*Total a pagar:* $${orderData.totalUSD.toFixed(2)} (${orderData.metodoPago})\n`;
-                
+
                 if (orderData.monedaSecundaria === 'VES' || orderData.monedaSecundaria === 'COP') {
                      const monedaSimbolo = orderData.monedaSecundaria === 'VES' ? 'Bs.' : '$ COP';
                      mensajeWa += `*Equivalente:* ${monedaSimbolo} ${orderData.totalSecundario.toFixed(2)}\n`;
                 }
-                
+
                 if (orderData.referencia !== 'N/A') {
                      mensajeWa += `*Referencia:* ${orderData.referencia}\n`;
                 }
                 if (orderData.comprobanteUrl) {
                      mensajeWa += `*Comprobante adjunto en el sistema.*\n`;
                 }
-                
+
                 mensajeWa += `\n*Dirección:* ${orderData.direccion}\n\nQuedo atento al envío. ¡Gracias!`;
 
                 const encodedMensaje = encodeURIComponent(mensajeWa);
