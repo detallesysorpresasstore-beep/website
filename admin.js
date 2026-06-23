@@ -3,7 +3,7 @@
  */
 
 import { auth, db, onAuthStateChanged, signOut } from './firebase-config.js';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, getDoc, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, onSnapshot, deleteDoc, doc, updateDoc, getDoc, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // NOTA: Rotar esta clave en imgbb.com/account/settings y usar una Cloud Function como proxy.
 const IMGBB_API_KEY = '6b8e2fe1e92a74135200cbf5317aa9bf';
@@ -18,6 +18,63 @@ function sanitize(str) {
     return div.innerHTML;
 }
 
+
+// ==========================================
+// SISTEMA DE NOTIFICACIONES (reemplaza alert/confirm nativos)
+// ==========================================
+function showToast(mensaje, tipo = 'info', duracion = 4000) {
+    const colores = {
+        success: 'border-green-500 bg-green-50 text-green-800',
+        error:   'border-red-500 bg-red-50 text-red-800',
+        warning: 'border-brand-orange bg-orange-50 text-orange-800',
+        info:    'border-brand-blue bg-blue-50 text-blue-800'
+    };
+    const iconos = {
+        success: 'ph-fill ph-check-circle text-green-500',
+        error:   'ph-fill ph-warning-circle text-red-500',
+        warning: 'ph-fill ph-warning text-brand-orange',
+        info:    'ph-fill ph-info text-brand-blue'
+    };
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] flex items-start gap-3 px-5 py-4 rounded-2xl shadow-2xl border-l-4 ${colores[tipo]} max-w-sm w-[90vw] transition-all duration-300 translate-y-4 opacity-0`;
+    toast.innerHTML = `<i class="${iconos[tipo]} text-xl shrink-0 mt-0.5"></i><p class="text-sm font-medium leading-snug">${mensaje}</p>`;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => { toast.classList.remove('translate-y-4','opacity-0'); });
+    setTimeout(() => {
+        toast.classList.add('translate-y-4','opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, duracion);
+}
+
+function showConfirm(mensaje, onConfirm, textoBtn = 'Confirmar', tipoPeligroso = false) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 z-[998] flex items-center justify-center p-4 backdrop-blur-sm';
+    const colorBtn = tipoPeligroso ? 'bg-red-500 hover:bg-red-600' : 'bg-brand-orange hover:bg-orange-500';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div class="flex items-start gap-3">
+                <i class="ph-fill ph-${tipoPeligroso ? 'warning-circle text-red-500' : 'question text-brand-orange'} text-2xl shrink-0 mt-0.5"></i>
+                <p class="text-gray-700 font-medium leading-snug">${mensaje}</p>
+            </div>
+            <div class="flex justify-end gap-3 mt-2">
+                <button id="confirm-cancel" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+                <button id="confirm-ok" class="${colorBtn} text-white font-bold px-4 py-2 rounded-lg transition-colors shadow-sm">${textoBtn}</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#confirm-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#confirm-ok').onclick = () => { overlay.remove(); onConfirm(); };
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+
+// ==========================================
+// UTILIDAD: Debounce para buscadores
+// ==========================================
+function debounce(fn, delay = 250) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+}
 // ==========================================
 // REFERENCIAS DEL DOM
 // ==========================================
@@ -153,7 +210,7 @@ function configurarEventos() {
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
     selectProdCategoria.addEventListener('change', (e) => actualizarSelectSubcategoriasFormulario(e.target.value));
-    buscadorProductos.addEventListener('input', aplicarFiltrosProductos);
+    buscadorProductos.addEventListener('input', debounce(aplicarFiltrosProductos));
     filtroCategoria.addEventListener('change', () => { actualizarSelectSubcategoriasFiltro(); aplicarFiltrosProductos(); });
     filtroSubcategoria.addEventListener('change', aplicarFiltrosProductos);
 
@@ -161,7 +218,7 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-cat').addEventListener('click', () => modalCategoria.classList.add('hidden'));
     btnGuardarCategoria.addEventListener('click', guardarCategoria);
-    if (buscadorCategorias) buscadorCategorias.addEventListener('input', aplicarFiltrosCategorias);
+    if (buscadorCategorias) buscadorCategorias.addEventListener('input', debounce(aplicarFiltrosCategorias));
 
     if (btnNuevaSubcategoria) { btnNuevaSubcategoria.addEventListener('click', () => { document.getElementById('form-subcategoria').reset(); modalSubcategoria.classList.remove('hidden'); }); }
     document.getElementById('btn-cerrar-modal-subcat').addEventListener('click', () => modalSubcategoria.classList.add('hidden'));
@@ -174,7 +231,7 @@ function configurarEventos() {
     if (filtroEstadoPedidos) filtroEstadoPedidos.addEventListener('change', aplicarFiltrosPedidos);
 
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
-    if (buscadorClientes) buscadorClientes.addEventListener('input', aplicarFiltrosClientes);
+    if (buscadorClientes) buscadorClientes.addEventListener('input', debounce(aplicarFiltrosClientes));
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
     if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
 
@@ -261,7 +318,7 @@ window.ejecutarLimpiezaHistorial = async () => {
     const modalLimpiar = document.getElementById('modal-limpiar-pedidos');
     
     const fechaLimite = inputFecha.value;
-    if (!fechaLimite) return alert("Por favor selecciona una fecha límite.");
+    if (!fechaLimite) { showToast("Por favor selecciona una fecha límite.", "warning"); return; }
 
     const pedidosAEliminar = pedidosGlobales.filter(p => {
         if (!p.fecha) return false;
@@ -270,31 +327,32 @@ window.ejecutarLimpiezaHistorial = async () => {
     });
 
     if (pedidosAEliminar.length === 0) {
-        return alert("No se encontraron pedidos registrados en esa fecha o anteriores.");
+        showToast("No se encontraron pedidos en esa fecha o anteriores.", "info"); return;
     }
 
-    if (!confirm(`⚠️ ADVERTENCIA: Estás a punto de eliminar permanentemente ${pedidosAEliminar.length} pedido(s). Esta acción NO se puede deshacer. ¿Deseas continuar?`)) {
-        return;
-    }
-
-    const originalText = btnConfirmar.innerHTML;
-    btnConfirmar.disabled = true;
-    btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Eliminando...';
-
-    try {
-        for (const pedido of pedidosAEliminar) {
-            await deleteDoc(doc(db, "orders", pedido.id));
-        }
-        alert(`✅ Se eliminaron ${pedidosAEliminar.length} pedidos del historial de forma exitosa.`);
-        modalLimpiar.classList.add('hidden');
-        cargarPedidos(); 
-    } catch (error) {
-        console.error("Error al limpiar historial:", error);
-        alert("Ocurrió un error durante la limpieza del historial.");
-    } finally {
-        btnConfirmar.disabled = false;
-        btnConfirmar.innerHTML = "Eliminar Pedidos";
-    }
+    showConfirm(
+        `Estás a punto de eliminar permanentemente ${pedidosAEliminar.length} pedido(s). Esta acción NO se puede deshacer.`,
+        async () => {
+            btnConfirmar.disabled = true;
+            btnConfirmar.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Eliminando...';
+            try {
+                for (const pedido of pedidosAEliminar) {
+                    await deleteDoc(doc(db, "orders", pedido.id));
+                }
+                showToast(`Se eliminaron ${pedidosAEliminar.length} pedidos del historial.`, "success");
+                modalLimpiar.classList.add('hidden');
+                cargarPedidos();
+            } catch (error) {
+                console.error("Error al limpiar historial:", error);
+                showToast("Ocurrió un error durante la limpieza.", "error");
+            } finally {
+                btnConfirmar.disabled = false;
+                btnConfirmar.innerHTML = "Eliminar Pedidos";
+            }
+        },
+        "Eliminar permanentemente",
+        true
+    );
 };
 
 // ==========================================
@@ -328,9 +386,9 @@ async function guardarTasas() {
 
     try {
         await setDoc(configDocRef, { tasaBcv, tasaCop, whatsapp, fechaActualizacion: new Date().toISOString() }, { merge: true });
-        alert("Configuración actualizada con éxito.");
+        showToast("Configuración actualizada con éxito.", "success");
     } catch (error) {
-        console.error("Error al guardar:", error); alert("Error al guardar.");
+        console.error("Error al guardar:", error); showToast("Error al guardar la configuración.", "error");
     } finally { btnGuardarTasas.disabled = false; btnGuardarTasas.innerHTML = originalText; }
 }
 
@@ -374,7 +432,7 @@ async function guardarPago() {
     const requisitos = document.getElementById('pago-requisitos').value;
     const instrucciones = document.getElementById('pago-instrucciones').value.trim();
 
-    if (!nombre) return alert("El nombre del método de pago es obligatorio.");
+    if (!nombre) { showToast("El nombre del método de pago es obligatorio.", "warning"); return; }
 
     btnGuardarPago.disabled = true; btnGuardarPago.innerText = "Guardando...";
     try {
@@ -382,9 +440,8 @@ async function guardarPago() {
         if (id) await updateDoc(doc(db, "payment_methods", id), datos);
         else await addDoc(paymentsCollection, datos);
         
-        modalPago.classList.add('hidden');
-        cargarPagos();
-    } catch (error) { alert("Error al guardar."); console.error(error); } 
+        modalPago.classList.add('hidden'); cargarPagos(); showToast("Método de pago guardado.", "success");
+    } catch (error) { showToast("Error al guardar el método de pago.", "error"); console.error(error); } 
     finally { btnGuardarPago.disabled = false; btnGuardarPago.innerText = "Guardar Método"; }
 }
 
@@ -401,9 +458,7 @@ window.prepararEdicionPago = (id) => {
 };
 
 window.eliminarPago = async (id) => {
-    if(confirm("¿Seguro que deseas eliminar este método de pago?")) {
-        await deleteDoc(doc(db, "payment_methods", id)); cargarPagos();
-    }
+    showConfirm("¿Seguro que deseas eliminar este método de pago?", async () => { await deleteDoc(doc(db, "payment_methods", id)); cargarPagos(); showToast("Método de pago eliminado.", "success"); }, "Eliminar", true);
 };
 
 // ==========================================
@@ -511,7 +566,7 @@ async function guardarPromocion() {
     const productoOfertaId = document.getElementById('promo-oferta-producto').value;
     const porcentajeDescuento = parseInt(document.getElementById('promo-oferta-descuento').value) || 0;
 
-    if (!nombre || !productoOfertaId || porcentajeDescuento <= 0) return alert("Completa el nombre, selecciona un producto para ofertar y pon un descuento válido.");
+    if (!nombre || !productoOfertaId || porcentajeDescuento <= 0) { showToast("Completa el nombre, selecciona un producto y define un descuento válido.", "warning"); return; }
 
     btnGuardarPromocion.disabled = true; btnGuardarPromocion.innerText = "Guardando...";
     try {
@@ -519,9 +574,8 @@ async function guardarPromocion() {
         if (id) await updateDoc(doc(db, "promotions", id), datos);
         else await addDoc(promosCollection, datos);
         
-        modalPromocion.classList.add('hidden');
-        cargarPromociones();
-    } catch (error) { alert("Error al guardar."); console.error(error); } 
+        modalPromocion.classList.add('hidden'); cargarPromociones(); showToast("Promoción guardada.", "success");
+    } catch (error) { showToast("Error al guardar la promoción.", "error"); console.error(error); } 
     finally { btnGuardarPromocion.disabled = false; btnGuardarPromocion.innerText = "Guardar Promoción"; }
 }
 
@@ -546,11 +600,7 @@ window.prepararEdicionPromo = (id) => {
     modalPromocion.classList.remove('hidden');
 };
 
-window.eliminarPromo = async (id) => {
-    if(confirm("¿Seguro que deseas eliminar esta promoción?")) {
-        await deleteDoc(doc(db, "promotions", id)); cargarPromociones();
-    }
-};
+window.eliminarPromo = async (id) => { showConfirm("¿Seguro que deseas eliminar esta promoción?", async () => { await deleteDoc(doc(db, "promotions", id)); cargarPromociones(); showToast("Promoción eliminada.", "success"); }, "Eliminar", true); };
 
 // ==========================================
 // NUEVO MÓDULO: OFERTAS DIRECTAS (CATÁLOGO)
@@ -613,20 +663,14 @@ async function guardarOferta() {
     const prodId = inputOfertaProductoId.value;
     const descuento = parseInt(inputOfertaDescuento.value) || 0;
 
-    if(!prodId || descuento <= 0 || descuento >= 100) {
-        return alert("Debes seleccionar un producto de la lista y asignar un descuento válido (1 al 99%).");
-    }
+    if(!prodId || descuento <= 0 || descuento >= 100) { showToast("Selecciona un producto y asigna un descuento entre 1 y 99%.", "warning"); return; }
 
     btnGuardarOferta.disabled = true; 
     btnGuardarOferta.innerHTML = '<i class="ph ph-spinner animate-spin"></i> Guardando...';
     try {
         await updateDoc(doc(db, "products", prodId), { descuento: descuento });
-        modalOferta.classList.add('hidden');
-        cargarProductos(); // Esto refrescará tanto la tabla de productos como la de ofertas
-    } catch (error) { 
-        alert("Error al aplicar la oferta."); 
-        console.error(error); 
-    } finally { 
+        modalOferta.classList.add('hidden'); cargarProductos(); showToast("Oferta aplicada correctamente.", "success");
+    } catch (error) { showToast("Error al aplicar la oferta.", "error"); console.error(error); } finally { 
         btnGuardarOferta.disabled = false; 
         btnGuardarOferta.innerHTML = '<i class="ph-bold ph-check-circle"></i> Guardar Oferta'; 
     }
@@ -723,26 +767,26 @@ function dibujarTablaCategorias(arreglo) {
 
 async function guardarCategoria() {
     const nombre = document.getElementById('cat-nombre').value.trim(); const icono = document.getElementById('cat-icono').value.trim() || 'ph-tag';
-    if (!nombre) return alert("El nombre es obligatorio.");
+    if (!nombre) { showToast("El nombre de la categoría es obligatorio.", "warning"); return; }
     btnGuardarCategoria.disabled = true; btnGuardarCategoria.innerText = "Guardando...";
-    try { await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] }); document.getElementById('modal-categoria').classList.add('hidden'); await cargarCategorias(); } 
-    catch (error) { alert("Hubo un error."); } finally { btnGuardarCategoria.disabled = false; btnGuardarCategoria.innerText = "Guardar"; }
+    try { await addDoc(categoriesCollection, { nombre, icono, subcategorias: [] }); document.getElementById('modal-categoria').classList.add('hidden'); showToast("Categoría guardada correctamente.", "success"); await cargarCategorias(); } 
+    catch (error) { showToast("Ocurrió un error al guardar.", "error"); } finally { btnGuardarCategoria.disabled = false; btnGuardarCategoria.innerText = "Guardar"; }
 }
 
 async function guardarSubcategoria() {
     const parentId = document.getElementById('subcat-parent').value; const subName = document.getElementById('subcat-nombre').value.trim();
-    if (!parentId || !subName) return alert("Selecciona una categoría padre y escribe un nombre.");
+    if (!parentId || !subName) { showToast("Selecciona una categoría padre y escribe un nombre.", "warning"); return; }
     btnGuardarSubcategoria.disabled = true; btnGuardarSubcategoria.innerText = "Guardando...";
     try {
         const categoriaPadre = categoriasGlobales.find(c => c.id === parentId);
         const nuevasSubcategorias = [...(categoriaPadre.subcategorias || [])];
         const existe = nuevasSubcategorias.find(s => s.toLowerCase() === subName.toLowerCase());
-        if (!existe) { nuevasSubcategorias.push(subName); await updateDoc(doc(db, "categories", parentId), { subcategorias: nuevasSubcategorias }); } else { alert("Esta subcategoría ya existe en esta categoría."); }
-        document.getElementById('modal-subcategoria').classList.add('hidden'); await cargarCategorias(); 
-    } catch (error) { alert("Hubo un error al guardar."); } finally { btnGuardarSubcategoria.disabled = false; btnGuardarSubcategoria.innerText = "Guardar Subcategoría"; }
+        if (!existe) { nuevasSubcategorias.push(subName); await updateDoc(doc(db, "categories", parentId), { subcategorias: nuevasSubcategorias }); } else { showToast("Esta subcategoría ya existe en esta categoría.", "warning"); }
+        document.getElementById('modal-subcategoria').classList.add('hidden'); showToast("Subcategoría guardada.", "success"); await cargarCategorias(); 
+    } catch (error) { showToast("Hubo un error al guardar.", "error"); } finally { btnGuardarSubcategoria.disabled = false; btnGuardarSubcategoria.innerText = "Guardar Subcategoría"; }
 }
 
-window.eliminarCategoria = async (id) => { if(confirm("¿Seguro que deseas eliminar esta categoría?")) { await deleteDoc(doc(db, "categories", id)); cargarCategorias(); } };
+window.eliminarCategoria = async (id) => { showConfirm("¿Seguro que deseas eliminar esta categoría?", async () => { await deleteDoc(doc(db, "categories", id)); cargarCategorias(); showToast("Categoría eliminada.", "success"); }, "Eliminar", true); };
 
 function actualizarSelectSubcategoriasFormulario(categoriaNombre, subcategoriaSeleccionada = "") {
     const selectSub = document.getElementById('prod-subcategoria'); selectSub.innerHTML = '<option value="">Seleccionar subcategoría...</option>';
@@ -788,7 +832,7 @@ window.quitarImagen = (index) => { arrayImagenesUrls.splice(index, 1); renderiza
 
 async function guardarProducto() {
     const id = document.getElementById('prod-id').value; const nombre = document.getElementById('prod-nombre').value.trim(); const categoria = document.getElementById('prod-categoria').value; const subcategoria = document.getElementById('prod-subcategoria').value; const precio = parseFloat(document.getElementById('prod-precio').value); const stock = parseInt(document.getElementById('prod-stock').value) || 0; const descripcion = document.getElementById('prod-descripcion').value.trim();
-    if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) return alert("Completa los datos obligatorios y sube foto.");
+    if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) { showToast("Completa todos los datos y sube al menos una foto.", "warning"); return; }
     btnGuardarProducto.disabled = true; btnGuardarProducto.innerText = "Guardando...";
     try {
         const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
@@ -841,7 +885,7 @@ window.prepararEdicionProd = (id) => {
     resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); document.getElementById('modal-producto').classList.remove('hidden');
 };
 
-window.eliminarProducto = async (id) => { if(confirm("¿Seguro que deseas eliminar este producto?")) { await deleteDoc(doc(db, "products", id)); cargarProductos(); } };
+window.eliminarProducto = async (id) => { showConfirm("¿Seguro que deseas eliminar este producto?", async () => { await deleteDoc(doc(db, "products", id)); cargarProductos(); showToast("Producto eliminado.", "success"); }, "Eliminar", true); };
 
 function exportarProductosExcel() {
     if (productosFiltrados.length === 0) return alert("No hay productos para exportar.");
@@ -884,8 +928,19 @@ function exportarClientesExcel() {
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
 
-async function cargarPedidos() {
-    try { const querySnapshot = await getDocs(ordersCollection); pedidosGlobales = []; querySnapshot.forEach((docSnap) => { const pedido = docSnap.data(); pedido.id = docSnap.id; pedidosGlobales.push(pedido); }); aplicarFiltrosPedidos(); } catch (error) { console.error(error); }
+function cargarPedidos() {
+    // Tiempo real: onSnapshot actualiza la tabla automáticamente sin recargar
+    onSnapshot(ordersCollection, (querySnapshot) => {
+        pedidosGlobales = [];
+        querySnapshot.forEach((docSnap) => {
+            const pedido = docSnap.data();
+            pedido.id = docSnap.id;
+            pedidosGlobales.push(pedido);
+        });
+        aplicarFiltrosPedidos();
+    }, (error) => {
+        console.error("Error en tiempo real de pedidos:", error);
+    });
 }
 
 function aplicarFiltrosPedidos() {
@@ -1026,11 +1081,12 @@ window.actualizarEstadoPedido = async () => {
 
         await updateDoc(orderRef, { estado: nuevoEstado }); 
         document.getElementById('modal-pedido').classList.add('hidden'); 
+        showToast("Estado del pedido actualizado.", "success");
         cargarPedidos(); 
         cargarProductos(); 
         
     } catch (error) { 
-        alert("Error al actualizar el estado del pedido."); 
+        showToast("Error al actualizar el estado del pedido.", "error"); 
         console.error(error); 
     } finally { 
         btnGuardar.disabled = false; 
