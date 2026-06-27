@@ -947,8 +947,14 @@
                     btn.querySelector('i').classList.add('ph-fill');
                     tituloSeccion.innerText = titulos[targetId];
                     
-                    vistas.forEach(v => v.classList.add('hidden')); 
+                    vistas.forEach(v => v.classList.add('hidden'));
                     document.getElementById(targetId).classList.remove('hidden');
+
+                    // Tarea 2: al volver al dashboard, refrescar KPIs/gráfica/listas
+                    if (targetId === 'vista-dashboard' && typeof window.cargarDashboard === 'function') {
+                        window.cargarDashboard();
+                    }
+
                     if(window.innerWidth < 768) toggleMenu();
                 });
             });
