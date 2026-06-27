@@ -398,8 +398,9 @@ let pedidosGlobales = [];
 let clientesGlobales = []; 
 let clientesFiltrados = []; 
 let pagosGlobales = []; 
-let promosGlobales = []; 
+let promosGlobales = [];
 let arrayImagenesUrls = [];
+let variantesProducto = []; // Variantes del producto en edición (Tarea 5)
 
 // ==========================================
 // INICIALIZACIÓN Y SEGURIDAD
@@ -455,6 +456,7 @@ function configurarEventos() {
     document.getElementById('btn-cerrar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('btn-cancelar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('prod-imagen').addEventListener('change', manejarSubidaMultiplesImagenes);
+    document.getElementById('btn-agregar-variante')?.addEventListener('click', () => agregarFilaVariante());
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
     selectProdCategoria.addEventListener('change', (e) => actualizarSelectSubcategoriasFormulario(e.target.value));
@@ -1080,12 +1082,65 @@ function renderizarGaleria() {
 }
 window.quitarImagen = (index) => { arrayImagenesUrls.splice(index, 1); renderizarGaleria(); };
 
+// ==========================================
+// MÓDULO: VARIANTES DE PRODUCTO (Tarea 5)
+// ==========================================
+function genVarId() { return 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function agregarFilaVariante(nombre = '', stock = 0, id = null) {
+    variantesProducto.push({ id: id || genVarId(), nombre, stock: parseInt(stock) || 0 });
+    renderVariantes();
+}
+
+window.actualizarVariante = (idx, campo, valor) => {
+    if (!variantesProducto[idx]) return;
+    variantesProducto[idx][campo] = (campo === 'stock') ? (parseInt(valor) || 0) : valor;
+    if (campo === 'stock') sincronizarStockConVariantes();
+};
+
+window.quitarVariante = (idx) => { variantesProducto.splice(idx, 1); renderVariantes(); };
+
+function renderVariantes() {
+    const cont = document.getElementById('variantes-container');
+    if (!cont) return;
+    cont.innerHTML = variantesProducto.map((v, i) => `
+        <div class="flex items-center gap-2">
+            <input type="text" value="${sanitize(v.nombre)}" placeholder="Ej: Talla S / Rojo"
+                oninput="window.actualizarVariante(${i}, 'nombre', this.value)"
+                class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-blue">
+            <input type="number" min="0" value="${v.stock}" placeholder="Stock"
+                oninput="window.actualizarVariante(${i}, 'stock', this.value)"
+                class="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-blue">
+            <button type="button" onclick="window.quitarVariante(${i})" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-lg"></i></button>
+        </div>`).join('');
+    sincronizarStockConVariantes();
+}
+
+// Si hay variantes, el stock del producto = suma de stocks de variantes (campo bloqueado)
+function sincronizarStockConVariantes() {
+    const inputStock = document.getElementById('prod-stock');
+    if (!inputStock) return;
+    if (variantesProducto.length > 0) {
+        inputStock.value = variantesProducto.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
+        inputStock.disabled = true;
+        inputStock.classList.add('bg-gray-100', 'text-gray-500');
+    } else {
+        inputStock.disabled = false;
+        inputStock.classList.remove('bg-gray-100', 'text-gray-500');
+    }
+}
+
 async function guardarProducto() {
-    const id = document.getElementById('prod-id').value; const nombre = document.getElementById('prod-nombre').value.trim(); const categoria = document.getElementById('prod-categoria').value; const subcategoria = document.getElementById('prod-subcategoria').value; const precio = parseFloat(document.getElementById('prod-precio').value); const stock = parseInt(document.getElementById('prod-stock').value) || 0; const descripcion = document.getElementById('prod-descripcion').value.trim();
+    const id = document.getElementById('prod-id').value; const nombre = document.getElementById('prod-nombre').value.trim(); const categoria = document.getElementById('prod-categoria').value; const subcategoria = document.getElementById('prod-subcategoria').value; const precio = parseFloat(document.getElementById('prod-precio').value); let stock = parseInt(document.getElementById('prod-stock').value) || 0; const descripcion = document.getElementById('prod-descripcion').value.trim();
     if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) { showToast("Completa todos los datos y sube al menos una foto.", "warning"); return; }
+    // Tarea 5: variantes válidas (con nombre); si existen, el stock = suma de sus stocks
+    const variantesValidas = variantesProducto
+        .filter(v => v.nombre && v.nombre.trim())
+        .map(v => ({ id: v.id || genVarId(), nombre: v.nombre.trim(), stock: parseInt(v.stock) || 0 }));
+    if (variantesValidas.length > 0) stock = variantesValidas.reduce((s, v) => s + v.stock, 0);
     btnGuardarProducto.disabled = true; btnGuardarProducto.innerText = "Guardando...";
     try {
-        const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
+        const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, variantes: variantesValidas, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
         if (id) await updateDoc(doc(db, "products", id), datos); else { datos.fechaCreacion = new Date().toISOString(); await addDoc(productsCollection, datos); }
         document.getElementById('modal-producto').classList.add('hidden'); cargarProductos();
     } catch (error) { console.error(error); } finally { btnGuardarProducto.disabled = false; btnGuardarProducto.innerText = "Guardar Producto"; }
@@ -1128,12 +1183,12 @@ function dibujarTablaProductos(arreglo) {
 }
 
 function resetearModalProducto(titulo) {
-    document.getElementById('form-producto').reset(); document.getElementById('prod-id').value = ''; document.getElementById('prod-descripcion').value = ''; document.getElementById('prod-stock').value = 1; actualizarSelectSubcategoriasFormulario(""); arrayImagenesUrls = []; renderizarGaleria(); document.getElementById('modal-titulo').innerText = titulo;
+    document.getElementById('form-producto').reset(); document.getElementById('prod-id').value = ''; document.getElementById('prod-descripcion').value = ''; document.getElementById('prod-stock').value = 1; actualizarSelectSubcategoriasFormulario(""); arrayImagenesUrls = []; renderizarGaleria(); variantesProducto = []; renderVariantes(); document.getElementById('modal-titulo').innerText = titulo;
 }
 
 window.prepararEdicionProd = (id) => {
     const prod = productosGlobales.find(p => p.id === id); if (!prod) return;
-    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); document.getElementById('modal-producto').classList.remove('hidden');
+    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); variantesProducto = (prod.variantes || []).map(v => ({ ...v })); renderVariantes(); document.getElementById('modal-producto').classList.remove('hidden');
 };
 
 window.eliminarProducto = async (id) => { showConfirm("¿Seguro que deseas eliminar este producto?", async () => { await deleteDoc(doc(db, "products", id)); cargarProductos(); showToast("Producto eliminado.", "success"); }, "Eliminar", true); };
@@ -1332,6 +1387,25 @@ window.abrirModalPedido = (id) => {
     document.getElementById('modal-pedido').classList.remove('hidden'); 
 };
 
+// Ajusta el stock de un ítem de pedido. signo +1 repone (cancelar), -1 descuenta (reactivar).
+// Si el ítem tiene variantId, ajusta el stock de esa variante y recalcula el total del producto.
+async function ajustarStockItem(item, signo) {
+    const idReal = item.productoOriginalId || item.id;
+    const ref = doc(db, "products", idReal);
+    if (item.variantId) {
+        const snap = await getDoc(ref);
+        if (!snap.exists()) return;
+        const datos = snap.data();
+        const variantes = Array.isArray(datos.variantes) ? datos.variantes.map(v => ({ ...v })) : [];
+        const v = variantes.find(x => x.id === item.variantId);
+        if (v) v.stock = Math.max(0, (v.stock || 0) + signo * item.cantidad);
+        const total = variantes.reduce((s, x) => s + (x.stock || 0), 0);
+        await updateDoc(ref, { variantes, stock: total });
+    } else {
+        await updateDoc(ref, { stock: increment(signo * item.cantidad) });
+    }
+}
+
 window.actualizarEstadoPedido = async () => {
     const id = document.getElementById('ped-id').value; 
     const nuevoEstado = document.getElementById('ped-estado').value; 
@@ -1347,16 +1421,10 @@ window.actualizarEstadoPedido = async () => {
             const orderData = orderSnap.data();
             
             if (nuevoEstado === 'Cancelado' && orderData.estado !== 'Cancelado') {
-                for (const item of orderData.productos) {
-                    const idReal = item.productoOriginalId || item.id;
-                    await updateDoc(doc(db, "products", idReal), { stock: increment(item.cantidad) });
-                }
-            } 
+                for (const item of orderData.productos) await ajustarStockItem(item, +1); // reponer
+            }
             else if (orderData.estado === 'Cancelado' && nuevoEstado !== 'Cancelado') {
-                for (const item of orderData.productos) {
-                    const idReal = item.productoOriginalId || item.id;
-                    await updateDoc(doc(db, "products", idReal), { stock: increment(-item.cantidad) });
-                }
+                for (const item of orderData.productos) await ajustarStockItem(item, -1); // descontar
             }
         }
 

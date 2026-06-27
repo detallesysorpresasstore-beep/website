@@ -1091,19 +1091,42 @@ function setupModalDetalle() {
         btnSumar.addEventListener('click', () => {
             if(!currentProductId) return;
             const prod = window.productosPublicos.find(p => p.id === currentProductId);
+            if(!prod) return;
+            const maxStock = obtenerStockSeleccionado(prod);
             let val = parseInt(inputQty.value);
-            if(prod && val < prod.stock) inputQty.value = val + 1;
-            else alert(`¡Lo sentimos! Solo tenemos ${prod.stock} unidades en stock.`);
+            if(val < maxStock) inputQty.value = val + 1;
+            else showToast(`Solo tenemos ${maxStock} unidades disponibles.`, "warning");
         });
     }
 
     if(btnAgregar) {
         btnAgregar.addEventListener('click', () => {
             if(!currentProductId) return;
+            const prod = window.productosPublicos.find(p => p.id === currentProductId);
+            if(!prod) return;
             const cantidad = parseInt(inputQty.value);
-            agregarAlCarritoGlobal(currentProductId, cantidad);
-            modal.classList.add('hidden'); 
+            if (Array.isArray(prod.variantes) && prod.variantes.length > 0) {
+                const varSelect = document.getElementById('detalle-variante-select');
+                const variantId = varSelect ? varSelect.value : '';
+                if (!variantId) { showToast('Por favor elige una opción (talla/color) antes de agregar.', 'warning'); return; }
+                const variante = prod.variantes.find(v => v.id === variantId);
+                if (!variante) { showToast('La opción seleccionada ya no está disponible.', 'error'); return; }
+                agregarAlCarritoGlobal(currentProductId, cantidad, variante);
+            } else {
+                agregarAlCarritoGlobal(currentProductId, cantidad);
+            }
+            modal.classList.add('hidden');
         });
+    }
+
+    // Stock disponible según la variante elegida (o el producto si no tiene variantes)
+    function obtenerStockSeleccionado(prod) {
+        if (Array.isArray(prod.variantes) && prod.variantes.length > 0) {
+            const varSelect = document.getElementById('detalle-variante-select');
+            const variante = varSelect && varSelect.value ? prod.variantes.find(v => v.id === varSelect.value) : null;
+            return variante ? (variante.stock || 0) : 0;
+        }
+        return prod.stock;
     }
 
     window.abrirModalDetalle = (id) => {
@@ -1134,6 +1157,25 @@ function setupModalDetalle() {
         const badge = document.getElementById('detalle-stock-badge');
         if(prod.stock > 5) { badge.className = "text-sm font-medium text-green-500 bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max"; badge.innerHTML = `<i class="ph-fill ph-check-circle"></i> En stock (${prod.stock})`; } 
         else { badge.className = "text-sm font-medium text-orange-500 bg-orange-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max"; badge.innerHTML = `<i class="ph-fill ph-warning-circle"></i> ¡Últimas ${prod.stock} unidades!`; }
+
+        // Tarea 5: selector de variantes (talla/color)
+        const varContainer = document.getElementById('detalle-variantes-container');
+        const varSelect = document.getElementById('detalle-variante-select');
+        if (varContainer && varSelect) {
+            const tieneVariantes = Array.isArray(prod.variantes) && prod.variantes.length > 0;
+            if (tieneVariantes) {
+                varSelect.innerHTML = '<option value="">Selecciona una opción...</option>' +
+                    prod.variantes.map(v => {
+                        const agotada = (v.stock || 0) <= 0;
+                        const etiqueta = agotada ? `${sanitize(v.nombre)} (Agotado)` : `${sanitize(v.nombre)} (${v.stock} disp.)`;
+                        return `<option value="${v.id}" ${agotada ? 'disabled' : ''}>${etiqueta}</option>`;
+                    }).join('');
+                varContainer.classList.remove('hidden');
+            } else {
+                varSelect.innerHTML = '<option value="">Selecciona una opción...</option>';
+                varContainer.classList.add('hidden');
+            }
+        }
 
         inputQty.value = 1;
         const imgPrincipal = document.getElementById('detalle-img-principal'); const contMiniaturas = document.getElementById('detalle-miniaturas');
@@ -1278,22 +1320,29 @@ window.agregarPromoAlCarrito = (idProductoOriginal, precioPromo) => {
     guardarCarritoLocal();
 };
 
-window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada) => {
+window.agregarAlCarritoGlobal = (idProducto, cantidadAgregada, variante = null) => {
     const productoBase = window.productosPublicos.find(p => p.id === idProducto);
     if(!productoBase) return;
 
-    const itemExistente = carritoCompras.find(item => item.id === idProducto);
+    // Línea de carrito independiente por variante (Tarea 5)
+    const lineId = variante ? `${productoBase.id}__${variante.id}` : productoBase.id;
+    const stockDisponible = variante ? (variante.stock || 0) : productoBase.stock;
+    const nombreLinea = variante ? `${productoBase.nombre} — ${variante.nombre}` : productoBase.nombre;
+
+    const itemExistente = carritoCompras.find(item => item.id === lineId);
     if (itemExistente) {
-        if(itemExistente.cantidad + cantidadAgregada > productoBase.stock) { showToast(`Solo tenemos ${productoBase.stock} unidades disponibles.`, "warning"); return; }
+        if(itemExistente.cantidad + cantidadAgregada > stockDisponible) { showToast(`Solo tenemos ${stockDisponible} unidades disponibles.`, "warning"); return; }
         itemExistente.cantidad += cantidadAgregada;
     } else {
-        if(cantidadAgregada > productoBase.stock) { showToast(`Stock insuficiente. Solo quedan ${productoBase.stock} unidades.`, "warning"); return; }
+        if(cantidadAgregada > stockDisponible) { showToast(`Stock insuficiente. Solo quedan ${stockDisponible} unidades.`, "warning"); return; }
         carritoCompras.push({
-            id: productoBase.id, 
+            id: lineId,
             productoOriginalId: productoBase.id,
-            nombre: productoBase.nombre, precio: productoBase.precio,
+            variantId: variante ? variante.id : null,
+            variantNombre: variante ? variante.nombre : null,
+            nombre: nombreLinea, precio: productoBase.precio,
             imagen: productoBase.imagenes.length > 0 ? productoBase.imagenes[0] : 'https://via.placeholder.com/150',
-            stockMaximo: productoBase.stock, cantidad: cantidadAgregada
+            stockMaximo: stockDisponible, cantidad: cantidadAgregada
         });
     }
     guardarCarritoLocal();
@@ -1583,26 +1632,33 @@ function setupCheckout() {
 
             try {
                 await runTransaction(db, async (transaction) => {
-                    let productosActualizar = [];
                     let productosVerificados = [];
                     let totalVerificadoUSD = 0;
 
-                    // SEGURIDAD: Verificar stock Y precios desde Firestore.
-                    // Nunca confiar en el precio del localStorage del cliente.
+                    // SEGURIDAD: Verificar stock Y precios desde Firestore (nunca del
+                    // localStorage). Leemos cada producto UNA sola vez (todas las lecturas
+                    // antes de las escrituras, como exige runTransaction) y descontamos
+                    // sobre una copia de trabajo, de modo que varias líneas del mismo
+                    // producto/variante se descuenten correctamente (Tarea 5).
+                    const idsUnicos = [...new Set(carritoCompras.map(it => it.productoOriginalId || it.id))];
+                    const productosDB = {};
+                    for (const pid of idsUnicos) {
+                        const ref = doc(db, "products", pid);
+                        const snap = await transaction.get(ref);
+                        if (!snap.exists()) throw new Error(`Un producto de tu carrito ya no está en la tienda.`);
+                        const datos = snap.data();
+                        productosDB[pid] = {
+                            ref,
+                            datos,
+                            stock: typeof datos.stock === 'number' ? datos.stock : (parseInt(datos.stock) || 0),
+                            variantes: Array.isArray(datos.variantes) ? datos.variantes.map(v => ({ ...v })) : null
+                        };
+                    }
+
                     for (const item of carritoCompras) {
-                        const idRealBaseDB = item.productoOriginalId || item.id;
-                        const prodRef = doc(db, "products", idRealBaseDB);
-                        const prodSnap = await transaction.get(prodRef);
-
-                        if (!prodSnap.exists()) {
-                            throw new Error(`El producto "${item.nombre}" ya no está en la tienda.`);
-                        }
-
-                        const datosReales = prodSnap.data();
-                        const stockActual = datosReales.stock;
-                        if (stockActual < item.cantidad) {
-                            throw new Error(`¡Uy! Alguien más acaba de llevarse el último "${item.nombre}". Solo quedan ${stockActual} unidades.`);
-                        }
+                        const pid = item.productoOriginalId || item.id;
+                        const P = productosDB[pid];
+                        const datosReales = P.datos;
 
                         // Precio real desde Firestore, aplicando descuento si existe
                         let precioReal = datosReales.precio;
@@ -1610,20 +1666,47 @@ function setupCheckout() {
                             precioReal = precioReal * (1 - (datosReales.descuento / 100));
                         }
 
+                        if (item.variantId) {
+                            if (!P.variantes) throw new Error(`La opción seleccionada de "${item.nombre}" ya no está disponible.`);
+                            const v = P.variantes.find(x => x.id === item.variantId);
+                            if (!v) throw new Error(`La opción seleccionada de "${item.nombre}" ya no está disponible.`);
+                            if ((v.stock || 0) < item.cantidad) {
+                                throw new Error(`¡Uy! Solo quedan ${v.stock || 0} unidades de "${item.nombre}".`);
+                            }
+                            v.stock = (v.stock || 0) - item.cantidad;
+                        } else if (P.variantes) {
+                            // Línea sin variante sobre un producto con variantes (promo o
+                            // carrito antiguo): descontamos de las variantes en orden para
+                            // mantener el invariante stock == suma(variantes).
+                            const totalDisp = P.variantes.reduce((s, v) => s + (v.stock || 0), 0);
+                            if (totalDisp < item.cantidad) {
+                                throw new Error(`¡Uy! Solo quedan ${totalDisp} unidades de "${item.nombre}".`);
+                            }
+                            let restante = item.cantidad;
+                            for (const v of P.variantes) {
+                                if (restante <= 0) break;
+                                const usar = Math.min(v.stock || 0, restante);
+                                v.stock = (v.stock || 0) - usar;
+                                restante -= usar;
+                            }
+                        } else {
+                            if (P.stock < item.cantidad) {
+                                throw new Error(`¡Uy! Alguien más acaba de llevarse el último "${item.nombre}". Solo quedan ${P.stock} unidades.`);
+                            }
+                            P.stock = P.stock - item.cantidad;
+                        }
+
                         totalVerificadoUSD += precioReal * item.cantidad;
 
                         productosVerificados.push({
-                            id: idRealBaseDB,
-                            productoOriginalId: idRealBaseDB,
-                            nombre: datosReales.nombre,
+                            id: pid,
+                            productoOriginalId: pid,
+                            variantId: item.variantId || null,
+                            variantNombre: item.variantNombre || null,
+                            nombre: item.variantNombre ? `${datosReales.nombre} — ${item.variantNombre}` : datosReales.nombre,
                             precio: parseFloat(precioReal.toFixed(2)),
                             imagen: item.imagen,
                             cantidad: item.cantidad
-                        });
-
-                        productosActualizar.push({
-                            ref: prodRef,
-                            nuevoStock: stockActual - item.cantidad
                         });
                     }
 
@@ -1650,8 +1733,13 @@ function setupCheckout() {
                         fecha: new Date().toISOString()
                     };
 
-                    for (const prod of productosActualizar) {
-                        transaction.update(prod.ref, { stock: prod.nuevoStock });
+                    for (const pid of idsUnicos) {
+                        const P = productosDB[pid];
+                        if (P.variantes) {
+                            transaction.update(P.ref, { variantes: P.variantes, stock: P.variantes.reduce((s, v) => s + (v.stock || 0), 0) });
+                        } else {
+                            transaction.update(P.ref, { stock: P.stock });
+                        }
                     }
 
                     const newOrderRef = doc(collection(db, "orders"));
