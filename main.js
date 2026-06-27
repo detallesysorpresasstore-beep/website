@@ -4,7 +4,7 @@
 
 import { auth, db, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, updateDoc, increment, runTransaction, query, where, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // NOTA: Rotar esta clave en imgbb.com/account/settings y usar una Cloud Function como proxy.
 const IMGBB_API_KEY = 'be437e8baf8925c075326d5b9ca91016';
@@ -80,7 +80,16 @@ let subtotalGlobal = 0;
 let configuracionTienda = { tasaBcv: 1, tasaCop: 1, whatsapp: '' };
 let metodosPagoPublicos = [];
 let promocionesPublicas = [];
-let urlComprobantePago = ''; 
+let urlComprobantePago = '';
+
+// Wishlist (favoritos)
+let favoritosUsuario = new Set();
+
+// Paginación del catálogo
+const PRODUCTOS_POR_PAGINA = 12;
+let ultimoProductoVisible = null;
+let hayMasProductos = true;
+let productosFiltradosActuales = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
@@ -92,6 +101,7 @@ async function initApp() {
     setupPerfilEdicion(); 
     monitorAuthState();
     setupLightbox(); 
+    setupBuscador();
     
     await cargarConfiguracionPublica();
     await cargarMetodosPago();
@@ -106,7 +116,7 @@ async function initApp() {
     setupModalDetalle();
     setupCheckout(); 
     
-    verificarCarritoAbandonado(); // Activamos el radar de ventas perdidas
+    verificarCarritoAbandonado();
 }
 
 // ==========================================
@@ -210,12 +220,17 @@ function monitorAuthState() {
                     if(currentUserData.role === 'admin' && !window.location.href.includes('admin.html')) {
                         window.location.href = 'admin.html';
                     }
+                    // Cargar favoritos del usuario
+                    favoritosUsuario = new Set(currentUserData.favoritos || []);
+                    actualizarBotonesFavoritos();
                 }
             } catch (err) {
                 console.warn("No se pudieron cargar los datos del perfil:", err);
             }
         } else {
             currentUserData = null;
+            favoritosUsuario = new Set();
+            actualizarBotonesFavoritos();
             if (btnLoginIcon) { btnLoginIcon.classList.remove('text-brand-orange', 'ph-fill'); btnLoginIcon.classList.add('ph'); }
             if(btnLoginMovil) btnLoginMovil.textContent = "Mi Cuenta";
         }
@@ -466,36 +481,77 @@ window.cargarPerfilUsuario = async () => {
 
         pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
+        // Pasos del timeline de tracking
+        const PASOS_TRACKING = [
+            { estado: 'Pendiente',   icono: 'ph-fill ph-clock',        label: 'Pedido recibido'   },
+            { estado: 'Procesando',  icono: 'ph-fill ph-gear',          label: 'En preparación'    },
+            { estado: 'Enviado',     icono: 'ph-fill ph-truck',         label: 'En camino'         },
+            { estado: 'Entregado',   icono: 'ph-fill ph-check-circle',  label: 'Entregado'         },
+        ];
+
+        const ordenEstados = ['Pendiente','Procesando','Enviado','Entregado'];
+
         let htmlTemporal = '';
         pedidos.forEach(pedido => {
+            const esCancelado = pedido.estado === 'Cancelado';
             let colorEstado = 'bg-gray-100 text-gray-600';
-            if(pedido.estado === 'Pendiente') colorEstado = 'bg-yellow-100 text-yellow-700 border-yellow-200'; 
-            if(pedido.estado === 'Procesando') colorEstado = 'bg-blue-100 text-blue-700 border-blue-200'; 
-            if(pedido.estado === 'Enviado') colorEstado = 'bg-indigo-100 text-indigo-700 border-indigo-200'; 
-            if(pedido.estado === 'Entregado') colorEstado = 'bg-green-100 text-green-700 border-green-200'; 
-            if(pedido.estado === 'Cancelado') colorEstado = 'bg-red-100 text-red-700 border-red-200';
+            if(pedido.estado === 'Pendiente')   colorEstado = 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            if(pedido.estado === 'Procesando')  colorEstado = 'bg-blue-100 text-blue-700 border-blue-200';
+            if(pedido.estado === 'Enviado')     colorEstado = 'bg-indigo-100 text-indigo-700 border-indigo-200';
+            if(pedido.estado === 'Entregado')   colorEstado = 'bg-green-100 text-green-700 border-green-200';
+            if(esCancelado)                     colorEstado = 'bg-red-100 text-red-700 border-red-200';
 
-            let fechaF = 'N/A';
-            if(pedido.fecha) {
-                fechaF = new Date(pedido.fecha).toLocaleDateString('es-VE', {day:'2-digit', month:'short', year:'numeric'});
-            }
-
+            const fechaF = pedido.fecha ? new Date(pedido.fecha).toLocaleDateString('es-VE', {day:'2-digit', month:'short', year:'numeric'}) : 'N/A';
             let cantItems = 0;
             if(pedido.productos) pedido.productos.forEach(p => cantItems += p.cantidad);
 
+            const indiceActual = ordenEstados.indexOf(pedido.estado);
+
+            // Timeline visual
+            let timelineHTML = '';
+            if (!esCancelado) {
+                timelineHTML = `<div class="flex items-center justify-between mt-3 px-1">`;
+                PASOS_TRACKING.forEach((paso, i) => {
+                    const completado = i <= indiceActual;
+                    const esActual   = i === indiceActual;
+                    const colorCirc  = completado ? (esActual ? 'bg-brand-blue text-white ring-2 ring-blue-200' : 'bg-green-500 text-white') : 'bg-gray-100 text-gray-400';
+                    const colorLabel = completado ? 'text-gray-700 font-medium' : 'text-gray-400';
+                    const lineColor  = i < indiceActual ? 'bg-green-400' : 'bg-gray-200';
+                    timelineHTML += `
+                        <div class="flex flex-col items-center gap-1 flex-1 ${i > 0 ? 'relative' : ''}">
+                            ${i > 0 ? `<div class="absolute top-3 right-1/2 w-full h-0.5 ${lineColor} -translate-y-1/2 z-0"></div>` : ''}
+                            <div class="w-7 h-7 rounded-full ${colorCirc} flex items-center justify-center z-10 text-xs relative transition-all">
+                                <i class="${paso.icono} text-sm"></i>
+                            </div>
+                            <span class="text-[9px] sm:text-[10px] ${colorLabel} text-center leading-tight">${paso.label}</span>
+                        </div>`;
+                });
+                timelineHTML += `</div>`;
+            }
+
+            // Número de tracking si existe
+            const trackingHTML = (pedido.trackingNumero && pedido.estado === 'Enviado')
+                ? `<p class="text-xs text-indigo-600 font-bold mt-2 flex items-center gap-1"><i class="ph-fill ph-barcode"></i> Guía: ${sanitize(pedido.trackingNumero)}</p>`
+                : '';
+
             htmlTemporal += `
-                <li class="bg-white p-3 sm:p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-brand-blue transition-colors">
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-bold text-gray-800 text-sm">Orden #${pedido.id.slice(-6).toUpperCase()}</span>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorEstado}">${sanitize(pedido.estado)}</span>
+                <li class="bg-white p-3 sm:p-4 rounded-xl border border-gray-100 shadow-sm hover:border-brand-blue transition-colors">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="font-bold text-gray-800 text-sm">Orden #${pedido.id.slice(-6).toUpperCase()}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${colorEstado}">${sanitize(pedido.estado)}</span>
+                            </div>
+                            <p class="text-xs text-gray-500"><i class="ph-fill ph-calendar-blank text-gray-400"></i> ${fechaF} • <i class="ph-fill ph-package text-gray-400"></i> ${cantItems} producto(s)</p>
+                            ${trackingHTML}
                         </div>
-                        <p class="text-xs text-gray-500"><i class="ph-fill ph-calendar-blank text-gray-400"></i> ${fechaF} <span class="mx-1">•</span> <i class="ph-fill ph-package text-gray-400"></i> ${cantItems} producto(s)</p>
+                        <div class="text-right shrink-0">
+                            <p class="font-black text-gray-800 text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${sanitize(pedido.metodoPago)}</p>
+                        </div>
                     </div>
-                    <div class="text-left sm:text-right">
-                        <p class="font-black text-gray-800 text-lg leading-none">$${pedido.totalUSD.toFixed(2)}</p>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mt-1">${sanitize(pedido.metodoPago)}</p>
-                    </div>
+                    ${timelineHTML}
+                    ${esCancelado ? '<p class="text-xs text-red-500 mt-2 font-medium text-center">❌ Este pedido fue cancelado</p>' : ''}
                 </li>
             `;
         });
@@ -583,18 +639,23 @@ function generarHtmlTarjetaProducto(prod) {
         `;
     }
 
-    // INTELIGENCIA DE COLOR: Etiqueta pequeña (solo rosada si implica niñas)
     const catNom = (prod.categoria || "").toLowerCase();
     const subCatNom = (prod.subcategoria || "").toLowerCase();
     const esNina = catNom.includes('niña') || subCatNom.includes('niña');
     const colorBadgeCat = esNina ? 'bg-pink-50 text-brand-pink' : 'bg-blue-50 text-brand-blue';
+    const esFavorito = favoritosUsuario.has(prod.id);
+    const heartClass = esFavorito ? 'ph-fill ph-heart text-red-500' : 'ph ph-heart text-gray-400 hover:text-red-400';
 
     return `
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer flex flex-col transition-all hover:shadow-md relative" onclick="abrirModalDetalle('${prod.id}')">
             ${badgeHTML}
+            <button class="btn-favorito absolute top-2 right-2 z-20 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-110" 
+                data-prod-id="${prod.id}" onclick="event.stopPropagation(); toggleFavorito('${prod.id}', this)">
+                <i class="${heartClass} text-lg"></i>
+            </button>
             <div class="relative w-full aspect-square bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
                 ${imgHTML}
-                <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20">
+                <div class="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
                     <span class="bg-white text-gray-800 font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full shadow-lg flex items-center gap-1 sm:gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all text-xs sm:text-base">
                         <i class="ph ph-eye sm:text-xl"></i> <span class="hidden sm:inline">Ver Detalle</span>
                     </span>
@@ -603,7 +664,7 @@ function generarHtmlTarjetaProducto(prod) {
             <div class="p-3 sm:p-5 flex flex-col flex-grow z-10">
                 <span class="text-[10px] sm:text-xs font-bold ${colorBadgeCat} px-2 py-0.5 rounded w-max uppercase tracking-wider mb-2 truncate">${sanitize(prod.categoria)}</span>
                 <h3 class="text-sm sm:text-lg font-semibold text-gray-800 mb-1 sm:mb-2 line-clamp-2 leading-tight">${sanitize(prod.nombre)}</h3>
-                <div class="mt-auto flex items-center justify-between">
+                <div class="mt-auto flex items-center justify-between gap-2">
                     ${precioHTML}
                     <button class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-brand-orange hover:text-white transition-colors flex-shrink-0" onclick="event.stopPropagation(); agregarAlCarritoGlobal('${prod.id}', 1);">
                         <i class="ph ph-shopping-cart text-lg sm:text-xl font-bold"></i>
@@ -614,15 +675,132 @@ function generarHtmlTarjetaProducto(prod) {
     `;
 }
 
-function renderizarCatalogo(productosAMostrar) {
-    const contenedor = document.getElementById('public-products'); 
-    if (productosAMostrar.length === 0) {
-        contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`; 
+// ==========================================
+// MÓDULO: WISHLIST (FAVORITOS)
+// ==========================================
+
+window.toggleFavorito = async (prodId, btn) => {
+    if (!currentUser) {
+        showToast('Inicia sesión para guardar favoritos.', 'info');
+        document.getElementById('modal-login').classList.remove('hidden');
         return;
     }
+    const estaGuardado = favoritosUsuario.has(prodId);
+    const icon = btn.querySelector('i');
+    try {
+        const userRef = doc(db, "users", currentUser.uid);
+        if (estaGuardado) {
+            favoritosUsuario.delete(prodId);
+            await updateDoc(userRef, { favoritos: arrayRemove(prodId) });
+            icon.className = 'ph ph-heart text-gray-400 hover:text-red-400 text-lg';
+            showToast('Eliminado de favoritos.', 'info', 2000);
+        } else {
+            favoritosUsuario.add(prodId);
+            await updateDoc(userRef, { favoritos: arrayUnion(prodId) });
+            icon.className = 'ph-fill ph-heart text-red-500 text-lg';
+            showToast('¡Guardado en favoritos! ❤️', 'success', 2000);
+        }
+    } catch (err) {
+        console.error("Error actualizando favoritos:", err);
+        showToast('Error al actualizar favoritos.', 'error');
+    }
+};
+
+function actualizarBotonesFavoritos() {
+    document.querySelectorAll('.btn-favorito').forEach(btn => {
+        const prodId = btn.dataset.prodId;
+        const icon = btn.querySelector('i');
+        if (!icon) return;
+        if (favoritosUsuario.has(prodId)) {
+            icon.className = 'ph-fill ph-heart text-red-500 text-lg';
+        } else {
+            icon.className = 'ph ph-heart text-gray-400 hover:text-red-400 text-lg';
+        }
+    });
+}
+
+// ==========================================
+// MÓDULO: COMPARTIR PRODUCTO
+// ==========================================
+
+window.compartirProducto = async (prodId, nombre) => {
+    const url = `${window.location.origin}${window.location.pathname}#producto-${prodId}`;
+    const texto = `¡Mira este producto en Detalles y Sorpresas STORE! ${nombre}`;
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: nombre, text: texto, url });
+        } catch(e) { /* usuario canceló */ }
+    } else {
+        try {
+            await navigator.clipboard.writeText(url);
+            showToast('Enlace copiado al portapapeles.', 'success', 2000);
+        } catch(e) {
+            showToast('No se pudo copiar el enlace.', 'error');
+        }
+    }
+};
+
+// ==========================================
+// MÓDULO: BUSCADOR DE PRODUCTOS
+// ==========================================
+
+function setupBuscador() {
+    const inputBuscador = document.getElementById('buscador-tienda');
+    if (!inputBuscador) return;
+    let timer;
+    inputBuscador.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            const texto = inputBuscador.value.trim().toLowerCase();
+            const tituloSeccion = document.getElementById('titulo-catalogo');
+            const contenedorSub = document.getElementById('filtros-subcategorias');
+
+            if (!texto) {
+                if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-orange">Nuevo</span>`;
+                if (contenedorSub) { contenedorSub.classList.add('hidden'); contenedorSub.innerHTML = ''; }
+                renderizarCatalogo(window.productosPublicos);
+                return;
+            }
+            const resultados = window.productosPublicos.filter(p =>
+                p.nombre.toLowerCase().includes(texto) ||
+                (p.categoria || '').toLowerCase().includes(texto) ||
+                (p.subcategoria || '').toLowerCase().includes(texto) ||
+                (p.descripcion || '').toLowerCase().includes(texto)
+            );
+            if (tituloSeccion) tituloSeccion.innerHTML = `Resultados para <span class="text-brand-blue">"${sanitize(texto)}"</span> <button onclick="document.getElementById('buscador-tienda').value=''; setupBuscador(); limpiarFiltros();" class="ml-4 align-middle text-sm bg-gray-100 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-full hover:bg-gray-200 transition-colors shadow-sm inline-flex items-center gap-1"><i class="ph ph-x"></i> Borrar</button>`;
+            if (contenedorSub) { contenedorSub.classList.add('hidden'); contenedorSub.innerHTML = ''; }
+            renderizarCatalogo(resultados);
+        }, 300);
+    });
+}
+
+function renderizarCatalogo(productosAMostrar) {
+    const contenedor = document.getElementById('public-products');
+    productosFiltradosActuales = productosAMostrar;
+
+    if (productosAMostrar.length === 0) {
+        contenedor.innerHTML = `<div class="col-span-full py-12 flex flex-col items-center justify-center text-gray-400"><i class="ph-duotone ph-package text-6xl mb-4 text-gray-300"></i><p class="text-lg">No encontramos productos en esta categoría.</p><button onclick="limpiarFiltros()" class="mt-4 text-brand-blue font-bold hover:underline">Ver todo el catálogo</button></div>`;
+        document.getElementById('btn-ver-mas')?.classList.add('hidden');
+        return;
+    }
+
+    // Paginación: mostrar primera página
+    const pagina1 = productosAMostrar.slice(0, PRODUCTOS_POR_PAGINA);
     let htmlTemporal = '';
-    productosAMostrar.forEach(prod => { htmlTemporal += generarHtmlTarjetaProducto(prod); });
+    pagina1.forEach(prod => { htmlTemporal += generarHtmlTarjetaProducto(prod); });
     contenedor.innerHTML = htmlTemporal;
+
+    // Botón "Ver más"
+    const btnVerMas = document.getElementById('btn-ver-mas');
+    if (btnVerMas) {
+        if (productosAMostrar.length > PRODUCTOS_POR_PAGINA) {
+            btnVerMas.dataset.pagina = '1';
+            btnVerMas.classList.remove('hidden');
+        } else {
+            btnVerMas.classList.add('hidden');
+        }
+    }
+    actualizarBotonesFavoritos();
 }
 
 function renderizarOfertas(listaOfertas) {
@@ -708,15 +886,34 @@ window.filtrarPorSubcategoria = (categoriaNombre, subcategoriaNombre) => {
 window.limpiarFiltros = () => {
     const tituloSeccion = document.getElementById('titulo-catalogo');
     if (tituloSeccion) tituloSeccion.innerHTML = `Lo Más <span class="text-brand-orange">Nuevo</span>`;
-    
-    // Ocultar botones de subcategoría al limpiar
+    const inputBuscador = document.getElementById('buscador-tienda');
+    if (inputBuscador) inputBuscador.value = '';
     const contenedorSub = document.getElementById('filtros-subcategorias');
-    if(contenedorSub) {
-        contenedorSub.classList.add('hidden');
-        contenedorSub.innerHTML = '';
-    }
-
+    if(contenedorSub) { contenedorSub.classList.add('hidden'); contenedorSub.innerHTML = ''; }
     renderizarCatalogo(window.productosPublicos);
+};
+
+window.cargarMasProductos = () => {
+    const btnVerMas = document.getElementById('btn-ver-mas');
+    if (!btnVerMas) return;
+    const paginaActual = parseInt(btnVerMas.dataset.pagina || '1');
+    const siguientePagina = paginaActual + 1;
+    const inicio = paginaActual * PRODUCTOS_POR_PAGINA;
+    const fin = siguientePagina * PRODUCTOS_POR_PAGINA;
+    const mas = productosFiltradosActuales.slice(inicio, fin);
+
+    const contenedor = document.getElementById('public-products');
+    mas.forEach(prod => {
+        const div = document.createElement('div');
+        div.innerHTML = generarHtmlTarjetaProducto(prod);
+        contenedor.appendChild(div.firstElementChild);
+    });
+    actualizarBotonesFavoritos();
+
+    btnVerMas.dataset.pagina = String(siguientePagina);
+    if (fin >= productosFiltradosActuales.length) {
+        btnVerMas.classList.add('hidden');
+    }
 };
 
 // ==========================================
@@ -919,6 +1116,30 @@ function setupModalDetalle() {
             }
         }
         
+        // Botón compartir en el modal
+        const btnCompartir = document.getElementById('btn-compartir-detalle');
+        if (btnCompartir) {
+            btnCompartir.onclick = () => compartirProducto(prod.id, prod.nombre);
+        }
+        // Botón favorito en el modal
+        const btnFavDetalle = document.getElementById('btn-fav-detalle');
+        if (btnFavDetalle) {
+            const esFav = favoritosUsuario.has(prod.id);
+            btnFavDetalle.innerHTML = esFav
+                ? '<i class="ph-fill ph-heart text-red-500 text-xl"></i>'
+                : '<i class="ph ph-heart text-gray-400 text-xl"></i>';
+            btnFavDetalle.onclick = () => {
+                // Use a real-button-compatible fake for toggleFavorito
+                const fakeBtnModal = { querySelector: (sel) => btnFavDetalle.querySelector(sel) };
+                await toggleFavorito(prod.id, fakeBtnModal);
+                // Sync icon after state update
+                const esFavAhora = favoritosUsuario.has(prod.id);
+                btnFavDetalle.innerHTML = esFavAhora
+                    ? '<i class="ph-fill ph-heart text-red-500 text-xl"></i>'
+                    : '<i class="ph ph-heart text-gray-400 text-xl"></i>';
+            };
+        }
+
         if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
         modal.classList.remove('hidden');
     };
