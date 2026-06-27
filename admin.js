@@ -75,6 +75,250 @@ function debounce(fn, delay = 250) {
     let timer;
     return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
 }
+
+// ==========================================
+// MÓDULO: DASHBOARD CON KPIs
+// ==========================================
+
+async function cargarDashboard() {
+    try {
+        const [ordersSnap, productsSnap] = await Promise.all([
+            getDocs(ordersCollection),
+            getDocs(productsCollection)
+        ]);
+
+        const pedidos = [];
+        ordersSnap.forEach(d => { let p = d.data(); p.id = d.id; pedidos.push(p); });
+        const productos = [];
+        productsSnap.forEach(d => { let p = d.data(); p.id = d.id; productos.push(p); });
+
+        const hoy = new Date();
+        const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+
+        const pedidosHoy = pedidos.filter(p => p.fecha && new Date(p.fecha) >= inicioHoy);
+        const pedidosMes = pedidos.filter(p => p.fecha && new Date(p.fecha) >= inicioMes);
+        const pendientes = pedidos.filter(p => p.estado === 'Pendiente');
+        const stockBajo = productos.filter(p => (p.stock !== undefined ? p.stock : 10) <= 3 && p.stock > 0);
+        const sinStock = productos.filter(p => p.stock === 0);
+
+        const ventasHoy = pedidosHoy.reduce((s, p) => s + (p.totalUSD || 0), 0);
+        const ventasMes = pedidosMes.reduce((s, p) => s + (p.totalUSD || 0), 0);
+
+        // KPI cards
+        document.getElementById('kpi-ventas-hoy').textContent = `$${ventasHoy.toFixed(2)}`;
+        document.getElementById('kpi-ventas-mes').textContent = `$${ventasMes.toFixed(2)}`;
+        document.getElementById('kpi-pedidos-pendientes').textContent = pendientes.length;
+        document.getElementById('kpi-stock-bajo').textContent = stockBajo.length + sinStock.length;
+
+        // Badge en el menú de stock bajo
+        const badgeStock = document.getElementById('badge-stock-bajo');
+        if (badgeStock) {
+            const total = stockBajo.length + sinStock.length;
+            badgeStock.textContent = total;
+            badgeStock.classList.toggle('hidden', total === 0);
+        }
+
+        // Gráfica de ventas últimos 7 días
+        const labels = [];
+        const datosVentas = [];
+        for (let i = 6; i >= 0; i--) {
+            const dia = new Date(hoy);
+            dia.setDate(hoy.getDate() - i);
+            const inicioDia = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate());
+            const finDia   = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate() + 1);
+            const ventasDia = pedidos
+                .filter(p => p.fecha && new Date(p.fecha) >= inicioDia && new Date(p.fecha) < finDia)
+                .reduce((s, p) => s + (p.totalUSD || 0), 0);
+            labels.push(dia.toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric' }));
+            datosVentas.push(parseFloat(ventasDia.toFixed(2)));
+        }
+
+        const ctx = document.getElementById('chart-ventas');
+        if (ctx) {
+            if (window._chartVentas) window._chartVentas.destroy();
+            window._chartVentas = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Ventas USD',
+                        data: datosVentas,
+                        backgroundColor: 'rgba(79, 172, 254, 0.7)',
+                        borderColor: '#4facfe',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => '$' + v } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Lista de stock crítico
+        const listaStockCritico = document.getElementById('lista-stock-critico');
+        if (listaStockCritico) {
+            if (stockBajo.length === 0 && sinStock.length === 0) {
+                listaStockCritico.innerHTML = '<li class="text-center text-gray-400 py-4 text-sm">Todo el inventario está en niveles normales.</li>';
+            } else {
+                listaStockCritico.innerHTML = [...sinStock, ...stockBajo].map(p => {
+                    const img = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : '';
+                    const color = p.stock === 0 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700';
+                    const label = p.stock === 0 ? 'Sin stock' : `${p.stock} uds`;
+                    return `<li class="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
+                        ${img ? `<img src="${img}" class="w-10 h-10 rounded-lg object-cover border border-gray-100">` : '<div class="w-10 h-10 rounded-lg bg-gray-100"></div>'}
+                        <div class="flex-1 min-w-0"><p class="text-sm font-medium text-gray-800 truncate">${sanitize(p.nombre)}</p><p class="text-xs text-gray-500">${sanitize(p.categoria)}</p></div>
+                        <span class="text-xs font-bold px-2 py-1 rounded-full ${color}">${label}</span>
+                    </li>`;
+                }).join('');
+            }
+        }
+
+        // Últimos 5 pedidos pendientes
+        const listaPendientes = document.getElementById('lista-pedidos-pendientes');
+        if (listaPendientes) {
+            const recientes = pendientes.sort((a,b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 5);
+            if (recientes.length === 0) {
+                listaPendientes.innerHTML = '<li class="text-center text-gray-400 py-4 text-sm">No hay pedidos pendientes.</li>';
+            } else {
+                listaPendientes.innerHTML = recientes.map(p => `
+                    <li class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-gray-50 px-2 rounded-lg transition-colors" onclick="abrirModalPedido('${p.id}')">
+                        <div>
+                            <span class="text-sm font-bold text-gray-800">#${p.id.slice(-6).toUpperCase()}</span>
+                            <span class="text-xs text-gray-500 ml-2">${sanitize(p.clienteNombre)}</span>
+                        </div>
+                        <span class="text-sm font-bold text-gray-800">$${(p.totalUSD || 0).toFixed(2)}</span>
+                    </li>`).join('');
+            }
+        }
+
+    } catch (error) {
+        console.error("Error cargando dashboard:", error);
+    }
+}
+
+// ==========================================
+// MÓDULO: EXPORTAR REPORTE DE VENTAS
+// ==========================================
+
+window.exportarReporteVentas = () => {
+    const fechaDesde = document.getElementById('reporte-fecha-desde')?.value;
+    const fechaHasta = document.getElementById('reporte-fecha-hasta')?.value;
+
+    let filtrados = pedidosGlobales.filter(p => p.estado !== 'Cancelado');
+
+    if (fechaDesde) filtrados = filtrados.filter(p => p.fecha && p.fecha.split('T')[0] >= fechaDesde);
+    if (fechaHasta) filtrados = filtrados.filter(p => p.fecha && p.fecha.split('T')[0] <= fechaHasta);
+
+    if (filtrados.length === 0) { showToast("No hay pedidos en ese rango para exportar.", "warning"); return; }
+
+    const totalUSD = filtrados.reduce((s, p) => s + (p.totalUSD || 0), 0);
+
+    const filas = filtrados.map(p => ({
+        "ID Orden": "#" + p.id.slice(-6).toUpperCase(),
+        "Fecha": p.fecha ? new Date(p.fecha).toLocaleDateString('es-VE') : 'N/A',
+        "Cliente": p.clienteNombre || 'Sin nombre',
+        "Email": p.clienteEmail || '',
+        "Método de Pago": p.metodoPago || '',
+        "Total USD": parseFloat((p.totalUSD || 0).toFixed(2)),
+        "Moneda Secundaria": p.monedaSecundaria || 'USD',
+        "Total Secundario": parseFloat((p.totalSecundario || 0).toFixed(2)),
+        "Estado": p.estado,
+        "Productos": (p.productos || []).map(x => `${x.nombre} x${x.cantidad}`).join(', '),
+    }));
+
+    filas.push({
+        "ID Orden": "TOTAL",
+        "Fecha": "", "Cliente": "", "Email": "", "Método de Pago": "",
+        "Total USD": parseFloat(totalUSD.toFixed(2)),
+        "Moneda Secundaria": "", "Total Secundario": "", "Estado": "", "Productos": ""
+    });
+
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Ventas");
+    const nombre = `Reporte_Ventas${fechaDesde ? '_'+fechaDesde : ''}${fechaHasta ? '_al_'+fechaHasta : ''}.xlsx`;
+    XLSX.writeFile(libro, nombre);
+    showToast(`Reporte exportado: ${filtrados.length} pedidos.`, "success");
+};
+
+
+// ==========================================
+// MÓDULO: IMPORTACIÓN MASIVA DE PRODUCTOS
+// ==========================================
+
+window.procesarImportacionExcel = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        const hoja = wb.Sheets[wb.SheetNames[0]];
+        const filas = XLSX.utils.sheet_to_json(hoja);
+
+        if (filas.length === 0) { showToast("El archivo está vacío.", "warning"); return; }
+
+        const camposRequeridos = ['nombre', 'categoria', 'precio', 'stock'];
+        const primeraFila = Object.keys(filas[0]).map(k => k.toLowerCase());
+        const faltantes = camposRequeridos.filter(c => !primeraFila.includes(c));
+        if (faltantes.length > 0) {
+            showToast(`Faltan columnas: ${faltantes.join(', ')}`, "error", 5000);
+            return;
+        }
+
+        showConfirm(
+            `¿Importar ${filas.length} producto(s) desde el Excel? Se agregarán como nuevos productos.`,
+            async () => {
+                let importados = 0;
+                let errores = 0;
+                for (const fila of filas) {
+                    try {
+                        const keys = Object.fromEntries(Object.entries(fila).map(([k,v]) => [k.toLowerCase(), v]));
+                        if (!keys.nombre || !keys.categoria || !keys.precio) { errores++; continue; }
+                        await addDoc(productsCollection, {
+                            nombre:      String(keys.nombre).trim(),
+                            categoria:   String(keys.categoria).trim(),
+                            subcategoria: String(keys.subcategoria || 'General').trim(),
+                            precio:      parseFloat(keys.precio) || 0,
+                            stock:       parseInt(keys.stock) || 0,
+                            descripcion: String(keys.descripcion || '').trim(),
+                            imagenes:    [],
+                            descuento:   0,
+                            fechaCreacion: new Date().toISOString(),
+                            fechaActualizacion: new Date().toISOString(),
+                        });
+                        importados++;
+                    } catch (e) { errores++; }
+                }
+                document.getElementById('modal-importacion')?.classList.add('hidden');
+                event.target.value = '';
+                showToast(`${importados} producto(s) importados.${errores > 0 ? ` ${errores} con errores.` : ''}`, importados > 0 ? "success" : "warning", 5000);
+                cargarProductos();
+            },
+            "Importar",
+            false
+        );
+    } catch (e) {
+        showToast("Error leyendo el archivo Excel.", "error");
+        console.error(e);
+    }
+};
+
+window.descargarPlantillaExcel = () => {
+    const plantilla = [{ nombre: "Ejemplo Producto", categoria: "Ropa Niña", subcategoria: "Vestidos", precio: 12.50, stock: 10, descripcion: "Descripción opcional" }];
+    const hoja = XLSX.utils.json_to_sheet(plantilla);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Productos");
+    XLSX.writeFile(libro, "Plantilla_Importacion.xlsx");
+};
+
 // ==========================================
 // REFERENCIAS DEL DOM
 // ==========================================
@@ -173,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cargarPedidos();
     cargarClientes();
+    cargarDashboard();
 });
 
 function verificarSeguridad() {
@@ -229,6 +474,8 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-ped').addEventListener('click', () => modalPedido.classList.add('hidden'));
     if (filtroFechaPedidos) filtroFechaPedidos.addEventListener('change', aplicarFiltrosPedidos);
     if (filtroEstadoPedidos) filtroEstadoPedidos.addEventListener('change', aplicarFiltrosPedidos);
+    const buscadorPedidos = document.getElementById('buscador-pedidos');
+    if (buscadorPedidos) buscadorPedidos.addEventListener('input', debounce(aplicarFiltrosPedidos));
 
     if (btnExportarClientes) btnExportarClientes.addEventListener('click', exportarClientesExcel);
     if (buscadorClientes) buscadorClientes.addEventListener('input', debounce(aplicarFiltrosClientes));
@@ -944,8 +1191,18 @@ function cargarPedidos() {
 }
 
 function aplicarFiltrosPedidos() {
-    const fecha = filtroFechaPedidos ? filtroFechaPedidos.value : ''; const estado = filtroEstadoPedidos ? filtroEstadoPedidos.value : '';
-    const filtrados = pedidosGlobales.filter(p => { const coincideEstado = estado === "" || p.estado === estado; const coincideFecha = fecha === "" || (p.fecha && p.fecha.split('T')[0] === fecha); return coincideEstado && coincideFecha; });
+    const fecha = filtroFechaPedidos ? filtroFechaPedidos.value : '';
+    const estado = filtroEstadoPedidos ? filtroEstadoPedidos.value : '';
+    const textoBusq = document.getElementById('buscador-pedidos')?.value.toLowerCase() || '';
+    const filtrados = pedidosGlobales.filter(p => {
+        const coincideEstado = estado === "" || p.estado === estado;
+        const coincideFecha  = fecha === "" || (p.fecha && p.fecha.split('T')[0] === fecha);
+        const coincideTexto  = !textoBusq ||
+            (p.clienteNombre || '').toLowerCase().includes(textoBusq) ||
+            p.id.toLowerCase().includes(textoBusq) ||
+            (p.clienteEmail || '').toLowerCase().includes(textoBusq);
+        return coincideEstado && coincideFecha && coincideTexto;
+    });
     dibujarTablaPedidos(filtrados);
 }
 
@@ -983,12 +1240,33 @@ function dibujarTablaPedidos(arreglo) {
     tbody.innerHTML = htmlTemporal;
 }
 
-window.abrirModalPedido = (id) => { 
+window.abrirModalPedido = (id) => {
+    // Reset campos adicionales del modal
+    const inputTracking = document.getElementById('input-tracking-numero');
+    const inputNota = document.getElementById('input-nota-pedido');
+    const contenedorTracking = document.getElementById('contenedor-tracking');
+    if (inputTracking) inputTracking.value = '';
+    if (inputNota) inputNota.value = '';
+    if (contenedorTracking) contenedorTracking.classList.add('hidden');
+    
     const pedido = pedidosGlobales.find(p => p.id === id);
     if(!pedido) return;
 
     document.getElementById('ped-id').value = id; 
     document.getElementById('ped-id-display').textContent = `#${id.slice(-6).toUpperCase()}`;
+    // Mostrar tracking existente si el pedido está Enviado
+    const pedidoActual = pedidosGlobales.find(p => p.id === id);
+    const contenedorTracking = document.getElementById('contenedor-tracking');
+    const inputTracking = document.getElementById('input-tracking-numero');
+    if (contenedorTracking && inputTracking && pedidoActual) {
+        if (pedidoActual.estado === 'Enviado') {
+            contenedorTracking.classList.remove('hidden');
+            inputTracking.value = pedidoActual.trackingNumero || '';
+        } else {
+            contenedorTracking.classList.add('hidden');
+            inputTracking.value = '';
+        }
+    }
     document.getElementById('ped-estado').value = pedido.estado; 
     
     document.getElementById('ped-cliente-nombre').textContent = sanitize(pedido.clienteNombre || 'Sin nombre');
@@ -1079,7 +1357,21 @@ window.actualizarEstadoPedido = async () => {
             }
         }
 
-        await updateDoc(orderRef, { estado: nuevoEstado }); 
+        const datosActualizar = { estado: nuevoEstado };
+        if (nuevoEstado === 'Enviado') {
+            const tracking = document.getElementById('input-tracking-numero')?.value.trim();
+            if (tracking) datosActualizar.trackingNumero = tracking;
+        }
+        // Guardar historial de cambios (orderData puede ser undefined si el doc no existía)
+        const historialPrevio = (typeof orderData !== 'undefined' ? orderData.historial : null) || [];
+        const historialEntry = {
+            estado: nuevoEstado,
+            fecha: new Date().toISOString(),
+            nota: document.getElementById('input-nota-pedido')?.value.trim() || ''
+        };
+        datosActualizar.historial = [...historialPrevio, historialEntry];
+
+        await updateDoc(orderRef, datosActualizar); 
         document.getElementById('modal-pedido').classList.add('hidden'); 
         showToast("Estado del pedido actualizado.", "success");
         cargarPedidos(); 
