@@ -77,20 +77,20 @@ function debounce(fn, delay = 250) {
 }
 
 // ==========================================
-// MÓDULO: DASHBOARD CON KPIs
+// MÓDULO: DASHBOARD CON KPIs (TIEMPO REAL)
 // ==========================================
+// Antes hacía su propio getDocs(); ahora renderiza a partir de los globales
+// pedidosGlobales (mantenido por el onSnapshot de cargarPedidos) y
+// productosGlobales (recargado por cargarProductos). Se invoca desde el
+// snapshot de pedidos y tras recargar productos, así los KPIs se actualizan
+// solos cuando llegan pedidos nuevos, sin duplicar listeners ni lecturas.
 
-async function cargarDashboard() {
+function renderDashboard() {
+    // Si la vista del dashboard no está en el DOM, no hay nada que renderizar
+    if (!document.getElementById('kpi-ventas-hoy')) return;
     try {
-        const [ordersSnap, productsSnap] = await Promise.all([
-            getDocs(ordersCollection),
-            getDocs(productsCollection)
-        ]);
-
-        const pedidos = [];
-        ordersSnap.forEach(d => { let p = d.data(); p.id = d.id; pedidos.push(p); });
-        const productos = [];
-        productsSnap.forEach(d => { let p = d.data(); p.id = d.id; productos.push(p); });
+        const pedidos = pedidosGlobales;
+        const productos = productosGlobales;
 
         const hoy = new Date();
         const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
@@ -199,9 +199,12 @@ async function cargarDashboard() {
         }
 
     } catch (error) {
-        console.error("Error cargando dashboard:", error);
+        console.error("Error renderizando dashboard:", error);
     }
 }
+
+// Compatibilidad + Tarea 2: refresco manual del dashboard (al navegar a la vista)
+window.cargarDashboard = renderDashboard;
 
 // ==========================================
 // MÓDULO: EXPORTAR REPORTE DE VENTAS
@@ -417,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cargarPedidos();
     cargarClientes();
-    cargarDashboard();
+    renderDashboard();
 });
 
 function verificarSeguridad() {
@@ -1097,6 +1100,7 @@ async function cargarProductos() {
         });
         aplicarFiltrosProductos();
         dibujarTablaOfertas(); // Refresca la tabla de ofertas también
+        renderDashboard();     // Refresca KPI de stock crítico
     } catch (error) { console.error(error); }
 }
 
@@ -1185,6 +1189,7 @@ function cargarPedidos() {
             pedidosGlobales.push(pedido);
         });
         aplicarFiltrosPedidos();
+        renderDashboard(); // KPIs en tiempo real cuando cambian los pedidos
     }, (error) => {
         console.error("Error en tiempo real de pedidos:", error);
     });
@@ -1255,13 +1260,11 @@ window.abrirModalPedido = (id) => {
     document.getElementById('ped-id').value = id; 
     document.getElementById('ped-id-display').textContent = `#${id.slice(-6).toUpperCase()}`;
     // Mostrar tracking existente si el pedido está Enviado
-    const pedidoActual = pedidosGlobales.find(p => p.id === id);
-    const contenedorTracking = document.getElementById('contenedor-tracking');
-    const inputTracking = document.getElementById('input-tracking-numero');
-    if (contenedorTracking && inputTracking && pedidoActual) {
-        if (pedidoActual.estado === 'Enviado') {
+    // (reutiliza pedido, contenedorTracking e inputTracking ya declarados arriba)
+    if (contenedorTracking && inputTracking && pedido) {
+        if (pedido.estado === 'Enviado') {
             contenedorTracking.classList.remove('hidden');
-            inputTracking.value = pedidoActual.trackingNumero || '';
+            inputTracking.value = pedido.trackingNumero || '';
         } else {
             contenedorTracking.classList.add('hidden');
             inputTracking.value = '';
