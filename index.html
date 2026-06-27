@@ -85,7 +85,7 @@
                     </div>
                 </div>
 
-                <nav class="hidden md:flex space-x-8">
+                <nav class="hidden md:flex items-center space-x-6">
                     <a href="#" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Inicio</a>
                     <a href="#categorias" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Categorías</a>
                     <a href="#ofertas" class="text-brand-orange font-bold hover:text-orange-600 transition-colors flex items-center gap-1">
@@ -93,6 +93,11 @@
                     </a>
                     <a href="#destacados" class="text-gray-600 hover:text-brand-blue font-medium transition-colors">Novedades</a>
                 </nav>
+                <div class="hidden md:flex items-center relative">
+                    <i class="ph ph-magnifying-glass absolute left-3 text-gray-400 text-lg pointer-events-none"></i>
+                    <input id="buscador-tienda" type="search" placeholder="Buscar productos..." 
+                        class="pl-9 pr-4 py-2 bg-gray-100 rounded-full text-sm text-gray-700 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand-blue transition-all w-48 focus:w-64">
+                </div>
 
                 <div class="flex items-center space-x-4">
                     <button id="btn-abrir-login" class="text-gray-600 hover:text-brand-orange transition-colors hidden sm:block" title="Mi Cuenta">
@@ -111,6 +116,14 @@
 
         <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100 absolute w-full z-40 shadow-lg">
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <div class="px-3 py-2">
+                    <div class="relative">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input id="buscador-tienda-movil" type="search" placeholder="Buscar productos..." 
+                            class="w-full pl-9 pr-4 py-2 bg-gray-100 rounded-full text-sm text-gray-700 focus:outline-none focus:bg-white focus:ring-2 focus:ring-brand-blue transition-all"
+                            oninput="document.getElementById('buscador-tienda').value=this.value; document.getElementById('buscador-tienda').dispatchEvent(new Event('input'))">
+                    </div>
+                </div>
                 <a href="#" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Inicio</a>
                 <a href="#categorias" class="block px-3 py-2 text-base font-medium text-gray-700 hover:text-brand-blue hover:bg-blue-50 rounded-md">Categorías</a>
                 <a href="#ofertas" class="block px-3 py-2 text-base font-bold text-brand-orange hover:bg-orange-50 rounded-md flex items-center gap-2">
@@ -221,6 +234,12 @@
                         <i class="ph ph-spinner animate-spin text-4xl mb-2 text-brand-blue"></i>
                         <p>Cargando los mejores productos para ti...</p>
                     </div>
+                </div>
+                <div class="flex justify-center mt-10">
+                    <button id="btn-ver-mas" onclick="cargarMasProductos()" 
+                        class="hidden bg-white border-2 border-brand-blue text-brand-blue font-bold py-3 px-10 rounded-full hover:bg-brand-blue hover:text-white transition-all duration-300 flex items-center gap-2 shadow-sm">
+                        <i class="ph ph-arrow-down text-xl"></i> Ver más productos
+                    </button>
                 </div>
             </div>
         </section>
@@ -423,6 +442,12 @@
                     <button id="btn-agregar-carrito" class="flex-1 bg-brand-orange text-white font-bold text-lg py-3 px-6 rounded-xl shadow-lg shadow-orange-500/30 hover:bg-orange-500 hover:shadow-orange-500/50 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2">
                         <i class="ph ph-shopping-cart text-2xl"></i>
                         Añadir al Carrito
+                    </button>
+                    <button id="btn-fav-detalle" title="Guardar en favoritos" class="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center hover:border-red-400 transition-colors flex-shrink-0">
+                        <i class="ph ph-heart text-gray-400 text-xl"></i>
+                    </button>
+                    <button id="btn-compartir-detalle" title="Compartir producto" class="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center hover:border-brand-blue transition-colors flex-shrink-0">
+                        <i class="ph ph-share-network text-gray-400 text-xl"></i>
                     </button>
                 </div>
             </div>
