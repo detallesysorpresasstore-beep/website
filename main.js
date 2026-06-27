@@ -299,6 +299,10 @@ function setupLoginModal() {
     }
 
     if (form) {
+        // Desactivamos la validación nativa del navegador para que nuestra
+        // validación en JS (Tarea 3) sea la única fuente y muestre mensajes
+        // en español consistentes, no las burbujas nativas del navegador.
+        form.noValidate = true;
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btnSubmit = document.getElementById('btn-submit-login');
@@ -310,6 +314,22 @@ function setupLoginModal() {
             const password = document.getElementById('login-password').value;
             const name = document.getElementById('login-name').value.trim();
             const phone = document.getElementById('login-phone').value.trim();
+
+            // Tarea 3: validación en cliente antes de llamar a Firebase
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const errores = [];
+            if (!email) errores.push('Ingresa tu correo electrónico.');
+            else if (!emailRegex.test(email)) errores.push('El correo electrónico no tiene un formato válido.');
+            if (!password) errores.push('Ingresa tu contraseña.');
+            else if (password.length < 6) errores.push('La contraseña debe tener al menos 6 caracteres.');
+            if (!isLoginMode && !name) errores.push('Ingresa tu nombre.');
+
+            if (errores.length > 0) {
+                loginError.innerHTML = errores.join('<br>');
+                loginError.classList.remove('hidden');
+                showToast(errores[0], 'warning');
+                return;
+            }
 
             const originalText = btnSubmit.innerHTML;
             btnSubmit.disabled = true; btnSubmit.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Procesando...';
@@ -375,8 +395,23 @@ function setupLoginModal() {
 
             } catch (error) {
                 console.error("Error en Auth:", error);
-                showToast('Correo o contraseña incorrectos. Intenta de nuevo.', 'error');
-            } finally { 
+                const mensajes = {
+                    'auth/invalid-email': 'El correo electrónico no es válido.',
+                    'auth/user-not-found': 'No existe una cuenta con ese correo.',
+                    'auth/wrong-password': 'Contraseña incorrecta.',
+                    'auth/invalid-credential': 'Correo o contraseña incorrectos.',
+                    'auth/email-already-in-use': 'Ya existe una cuenta con ese correo. Inicia sesión.',
+                    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+                    'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
+                    'auth/network-request-failed': 'Error de conexión. Revisa tu internet.'
+                };
+                const msg = mensajes[error.code] || (isLoginMode
+                    ? 'Correo o contraseña incorrectos. Intenta de nuevo.'
+                    : 'No se pudo crear la cuenta. Intenta de nuevo.');
+                loginError.textContent = msg;
+                loginError.classList.remove('hidden');
+                showToast(msg, 'error');
+            } finally {
                 btnSubmit.disabled = false; btnSubmit.innerHTML = originalText; 
             }
         });
@@ -1128,7 +1163,7 @@ function setupModalDetalle() {
             btnFavDetalle.innerHTML = esFav
                 ? '<i class="ph-fill ph-heart text-red-500 text-xl"></i>'
                 : '<i class="ph ph-heart text-gray-400 text-xl"></i>';
-            btnFavDetalle.onclick = () => {
+            btnFavDetalle.onclick = async () => {
                 // Use a real-button-compatible fake for toggleFavorito
                 const fakeBtnModal = { querySelector: (sel) => btnFavDetalle.querySelector(sel) };
                 await toggleFavorito(prod.id, fakeBtnModal);

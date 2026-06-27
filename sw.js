@@ -4,7 +4,7 @@
 //             Network-first para Firebase y API calls
 // ==========================================
 
-const CACHE_VERSION = 'dys-v1';
+const CACHE_VERSION = 'dys-v2';
 const CACHE_STATIC = `${CACHE_VERSION}-static`;
 const CACHE_DYNAMIC = `${CACHE_VERSION}-dynamic`;
 
