@@ -1158,13 +1158,18 @@ function setupModalDetalle() {
         if(prod.stock > 5) { badge.className = "text-sm font-medium text-green-500 bg-green-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max"; badge.innerHTML = `<i class="ph-fill ph-check-circle"></i> En stock (${prod.stock})`; } 
         else { badge.className = "text-sm font-medium text-orange-500 bg-orange-50 px-2 py-1 rounded-lg flex items-center gap-1 w-max"; badge.innerHTML = `<i class="ph-fill ph-warning-circle"></i> ¡Últimas ${prod.stock} unidades!`; }
 
-        // Tarea 5: selector de variantes (talla/color)
+        // Selector de talla/edad (inventario por variante)
         const varContainer = document.getElementById('detalle-variantes-container');
         const varSelect = document.getElementById('detalle-variante-select');
+        const varTitulo = document.getElementById('detalle-variantes-titulo');
         if (varContainer && varSelect) {
             const tieneVariantes = Array.isArray(prod.variantes) && prod.variantes.length > 0;
             if (tieneVariantes) {
-                varSelect.innerHTML = '<option value="">Selecciona una opción...</option>' +
+                const esEdad = prod.tipoVariante === 'edad';
+                const esTalla = prod.tipoVariante === 'talla';
+                if (varTitulo) varTitulo.textContent = esEdad ? 'Elige la edad' : (esTalla ? 'Elige tu talla' : 'Elige una opción');
+                const placeholder = esEdad ? 'Selecciona la edad...' : (esTalla ? 'Selecciona la talla...' : 'Selecciona una opción...');
+                varSelect.innerHTML = `<option value="">${placeholder}</option>` +
                     prod.variantes.map(v => {
                         const agotada = (v.stock || 0) <= 0;
                         const etiqueta = agotada ? `${sanitize(v.nombre)} (Agotado)` : `${sanitize(v.nombre)} (${v.stock} disp.)`;

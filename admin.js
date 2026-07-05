@@ -457,6 +457,7 @@ function configurarEventos() {
     document.getElementById('btn-cancelar-modal-prod').addEventListener('click', () => modalProducto.classList.add('hidden'));
     document.getElementById('prod-imagen').addEventListener('change', manejarSubidaMultiplesImagenes);
     document.getElementById('btn-agregar-variante')?.addEventListener('click', () => agregarFilaVariante());
+    document.getElementById('prod-tipo-inventario')?.addEventListener('change', () => { variantesProducto = []; aplicarTipoInventario(); });
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
     selectProdCategoria.addEventListener('change', (e) => actualizarSelectSubcategoriasFormulario(e.target.value));
@@ -1083,9 +1084,29 @@ function renderizarGaleria() {
 window.quitarImagen = (index) => { arrayImagenesUrls.splice(index, 1); renderizarGaleria(); };
 
 // ==========================================
-// MÓDULO: VARIANTES DE PRODUCTO (Tarea 5)
+// MÓDULO: INVENTARIO POR TALLA / EDAD
 // ==========================================
 function genVarId() { return 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function tipoInventarioActual() {
+    const sel = document.getElementById('prod-tipo-inventario');
+    return sel ? sel.value : 'ninguno';
+}
+
+function etiquetasTipo(tipo) {
+    if (tipo === 'edad') return { placeholder: 'Ej: 0-2 años', boton: 'Agregar edad' };
+    return { placeholder: 'Ej: S, M, L', boton: 'Agregar talla' };
+}
+
+// Muestra/oculta la lista de tallas/edades y sincroniza el campo Stock
+function aplicarTipoInventario() {
+    const tipo = tipoInventarioActual();
+    const wrapper = document.getElementById('variantes-wrapper');
+    const btnLabel = document.getElementById('btn-agregar-variante-label');
+    if (btnLabel) btnLabel.textContent = etiquetasTipo(tipo).boton;
+    if (wrapper) wrapper.classList.toggle('hidden', tipo === 'ninguno');
+    renderVariantes();
+}
 
 function agregarFilaVariante(nombre = '', stock = 0, id = null) {
     variantesProducto.push({ id: id || genVarId(), nombre, stock: parseInt(stock) || 0 });
@@ -1103,9 +1124,10 @@ window.quitarVariante = (idx) => { variantesProducto.splice(idx, 1); renderVaria
 function renderVariantes() {
     const cont = document.getElementById('variantes-container');
     if (!cont) return;
+    const ph = etiquetasTipo(tipoInventarioActual()).placeholder;
     cont.innerHTML = variantesProducto.map((v, i) => `
         <div class="flex items-center gap-2">
-            <input type="text" value="${sanitize(v.nombre)}" placeholder="Ej: Talla S / Rojo"
+            <input type="text" value="${sanitize(v.nombre)}" placeholder="${ph}"
                 oninput="window.actualizarVariante(${i}, 'nombre', this.value)"
                 class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-blue">
             <input type="number" min="0" value="${v.stock}" placeholder="Stock"
@@ -1116,11 +1138,11 @@ function renderVariantes() {
     sincronizarStockConVariantes();
 }
 
-// Si hay variantes, el stock del producto = suma de stocks de variantes (campo bloqueado)
+// Si el producto maneja talla/edad, el stock = suma de las filas (campo bloqueado)
 function sincronizarStockConVariantes() {
     const inputStock = document.getElementById('prod-stock');
     if (!inputStock) return;
-    if (variantesProducto.length > 0) {
+    if (tipoInventarioActual() !== 'ninguno') {
         inputStock.value = variantesProducto.reduce((s, v) => s + (parseInt(v.stock) || 0), 0);
         inputStock.disabled = true;
         inputStock.classList.add('bg-gray-100', 'text-gray-500');
@@ -1133,14 +1155,22 @@ function sincronizarStockConVariantes() {
 async function guardarProducto() {
     const id = document.getElementById('prod-id').value; const nombre = document.getElementById('prod-nombre').value.trim(); const categoria = document.getElementById('prod-categoria').value; const subcategoria = document.getElementById('prod-subcategoria').value; const precio = parseFloat(document.getElementById('prod-precio').value); let stock = parseInt(document.getElementById('prod-stock').value) || 0; const descripcion = document.getElementById('prod-descripcion').value.trim();
     if (!nombre || !categoria || !subcategoria || isNaN(precio) || arrayImagenesUrls.length === 0) { showToast("Completa todos los datos y sube al menos una foto.", "warning"); return; }
-    // Tarea 5: variantes válidas (con nombre); si existen, el stock = suma de sus stocks
-    const variantesValidas = variantesProducto
-        .filter(v => v.nombre && v.nombre.trim())
-        .map(v => ({ id: v.id || genVarId(), nombre: v.nombre.trim(), stock: parseInt(v.stock) || 0 }));
-    if (variantesValidas.length > 0) stock = variantesValidas.reduce((s, v) => s + v.stock, 0);
+    // Inventario por talla/edad: si el producto maneja tallas o edades, el stock = suma de las filas
+    const tipoInventario = tipoInventarioActual(); // 'ninguno' | 'talla' | 'edad'
+    let variantesValidas = [];
+    if (tipoInventario !== 'ninguno') {
+        variantesValidas = variantesProducto
+            .filter(v => v.nombre && v.nombre.trim())
+            .map(v => ({ id: v.id || genVarId(), nombre: v.nombre.trim(), stock: parseInt(v.stock) || 0 }));
+        if (variantesValidas.length === 0) {
+            showToast(`Agrega al menos una ${tipoInventario} con su stock, o cambia a "Stock único".`, "warning");
+            return;
+        }
+        stock = variantesValidas.reduce((s, v) => s + v.stock, 0);
+    }
     btnGuardarProducto.disabled = true; btnGuardarProducto.innerText = "Guardando...";
     try {
-        const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, variantes: variantesValidas, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
+        const datos = { nombre, categoria, subcategoria, precio, stock, descripcion, tipoVariante: tipoInventario, variantes: variantesValidas, imagenes: arrayImagenesUrls, fechaActualizacion: new Date().toISOString() };
         if (id) await updateDoc(doc(db, "products", id), datos); else { datos.fechaCreacion = new Date().toISOString(); await addDoc(productsCollection, datos); }
         document.getElementById('modal-producto').classList.add('hidden'); cargarProductos();
     } catch (error) { console.error(error); } finally { btnGuardarProducto.disabled = false; btnGuardarProducto.innerText = "Guardar Producto"; }
@@ -1177,18 +1207,30 @@ function dibujarTablaProductos(arreglo) {
         
         const etiquetaOferta = (prod.descuento && prod.descuento > 0) ? `<br><span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold mt-1 inline-block">-${prod.descuento}% OFF</span>` : '';
 
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${sanitize(prod.nombre)}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${sanitize(prod.categoria)}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${sanitize(prod.subcategoria)}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="prepararEdicionProd('${prod.id}')" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4"><div class="flex items-center gap-3">${imgHTML}<div><span class="font-medium text-gray-800">${sanitize(prod.nombre)}</span>${etiquetaOferta}</div></div></td><td class="p-4"><span class="px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-700">${sanitize(prod.categoria)}</span><br><span class="text-xs text-gray-500 mt-1 inline-block"><i class="ph ph-arrow-elbow-down-right"></i> ${sanitize(prod.subcategoria)}</span></td><td class="p-4 font-bold text-gray-800">$${prod.precio.toFixed(2)}</td><td class="p-4 ${stockColor}">${prod.stock} unds</td><td class="p-4 text-center"><button onclick="duplicarProducto('${prod.id}')" title="Variante de producto (duplicar)" class="text-gray-400 hover:text-brand-orange p-1"><i class="ph ph-copy text-xl"></i></button><button onclick="prepararEdicionProd('${prod.id}')" title="Editar" class="text-gray-400 hover:text-brand-blue p-1 ml-2"><i class="ph ph-pencil-simple text-xl"></i></button><button onclick="eliminarProducto('${prod.id}')" title="Eliminar" class="text-gray-400 hover:text-red-500 p-1 ml-2"><i class="ph ph-trash text-xl"></i></button></td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
 
 function resetearModalProducto(titulo) {
-    document.getElementById('form-producto').reset(); document.getElementById('prod-id').value = ''; document.getElementById('prod-descripcion').value = ''; document.getElementById('prod-stock').value = 1; actualizarSelectSubcategoriasFormulario(""); arrayImagenesUrls = []; renderizarGaleria(); variantesProducto = []; renderVariantes(); document.getElementById('modal-titulo').innerText = titulo;
+    document.getElementById('form-producto').reset(); document.getElementById('prod-id').value = ''; document.getElementById('prod-descripcion').value = ''; document.getElementById('prod-stock').value = 1; actualizarSelectSubcategoriasFormulario(""); arrayImagenesUrls = []; renderizarGaleria(); variantesProducto = []; const selTipoReset = document.getElementById('prod-tipo-inventario'); if (selTipoReset) selTipoReset.value = 'ninguno'; aplicarTipoInventario(); document.getElementById('modal-titulo').innerText = titulo;
 }
 
 window.prepararEdicionProd = (id) => {
     const prod = productosGlobales.find(p => p.id === id); if (!prod) return;
-    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); variantesProducto = (prod.variantes || []).map(v => ({ ...v })); renderVariantes(); document.getElementById('modal-producto').classList.remove('hidden');
+    resetearModalProducto("Editar Producto"); document.getElementById('prod-id').value = prod.id; document.getElementById('prod-nombre').value = prod.nombre; document.getElementById('prod-categoria').value = prod.categoria; document.getElementById('prod-precio').value = prod.precio; document.getElementById('prod-stock').value = prod.stock !== undefined ? prod.stock : 10; document.getElementById('prod-descripcion').value = prod.descripcion || ''; actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria); arrayImagenesUrls = [...prod.imagenes]; renderizarGaleria(); variantesProducto = (prod.variantes || []).map(v => ({ ...v })); const selTipoEdit = document.getElementById('prod-tipo-inventario'); if (selTipoEdit) selTipoEdit.value = prod.tipoVariante || (variantesProducto.length > 0 ? 'talla' : 'ninguno'); aplicarTipoInventario(); document.getElementById('modal-producto').classList.remove('hidden');
+};
+
+// Crea un producto NUEVO copiando SOLO nombre, categoría, subcategoría y descripción
+window.duplicarProducto = (id) => {
+    const prod = productosGlobales.find(p => p.id === id); if (!prod) return;
+    resetearModalProducto("Nuevo producto (variante)");
+    document.getElementById('prod-nombre').value = prod.nombre;
+    document.getElementById('prod-categoria').value = prod.categoria;
+    actualizarSelectSubcategoriasFormulario(prod.categoria, prod.subcategoria);
+    document.getElementById('prod-descripcion').value = prod.descripcion || '';
+    // prod-id queda vacío => al guardar se crea un producto independiente
+    document.getElementById('modal-producto').classList.remove('hidden');
 };
 
 window.eliminarProducto = async (id) => { showConfirm("¿Seguro que deseas eliminar este producto?", async () => { await deleteDoc(doc(db, "products", id)); cargarProductos(); showToast("Producto eliminado.", "success"); }, "Eliminar", true); };
