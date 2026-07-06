@@ -76,7 +76,11 @@
             <button data-target="vista-clientes" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
                 <i class="ph ph-users text-xl"></i> Clientes
             </button>
-            
+            <button data-target="vista-resenas" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
+                <i class="ph ph-star text-xl"></i> <span>Reseñas</span>
+                <span id="badge-resenas-pendientes" class="hidden ml-auto bg-brand-orange text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+            </button>
+
             <div class="my-4 border-t border-gray-100"></div>
 
             <button data-target="vista-configuracion" class="nav-btn w-full flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-brand-orange rounded-xl font-medium transition-colors">
@@ -318,6 +322,18 @@
                         <tbody id="admin-clients-list" class="divide-y divide-gray-200"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <div id="vista-resenas" class="vista-seccion hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                    <p class="text-sm text-gray-500">Aprueba o elimina las reseñas de los clientes. Solo las <b>aprobadas</b> se muestran en la tienda.</p>
+                    <select id="filtro-resenas" class="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-600 focus:outline-none focus:border-brand-blue">
+                        <option value="pendientes">Pendientes por revisar</option>
+                        <option value="aprobadas">Aprobadas</option>
+                        <option value="todas">Todas</option>
+                    </select>
+                </div>
+                <div id="admin-resenas-lista" class="space-y-3"></div>
             </div>
 
             <div id="vista-configuracion" class="vista-seccion hidden">
@@ -945,6 +961,7 @@
                 'vista-categorias': 'Gestión de Categorías',
                 'vista-pedidos': 'Control de Pedidos',
                 'vista-clientes': 'Directorio de Usuarios',
+                'vista-resenas': 'Moderación de Reseñas',
                 'vista-configuracion': 'Tasas y Métodos de Pago',
                 'vista-promociones': 'Motor de Promociones',
                 'vista-ofertas': 'Gestión de Ofertas' 
@@ -971,6 +988,10 @@
                     // Tarea 2: al volver al dashboard, refrescar KPIs/gráfica/listas
                     if (targetId === 'vista-dashboard' && typeof window.cargarDashboard === 'function') {
                         window.cargarDashboard();
+                    }
+                    // Tarea 7: al abrir Reseñas, recargar la lista de moderación
+                    if (targetId === 'vista-resenas' && typeof window.cargarResenas === 'function') {
+                        window.cargarResenas();
                     }
 
                     if(window.innerWidth < 768) toggleMenu();

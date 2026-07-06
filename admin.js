@@ -387,7 +387,8 @@ const categoriesCollection = collection(db, "categories");
 const ordersCollection = collection(db, "orders");
 const usersCollection = collection(db, "users"); 
 const paymentsCollection = collection(db, "payment_methods"); 
-const promosCollection = collection(db, "promotions"); 
+const promosCollection = collection(db, "promotions");
+const reviewsCollection = collection(db, "reviews");
 const configDocRef = doc(db, "config", "store_settings");
 
 // Variables Globales
@@ -401,6 +402,7 @@ let pagosGlobales = [];
 let promosGlobales = [];
 let arrayImagenesUrls = [];
 let variantesProducto = []; // Variantes del producto en edición (Tarea 5)
+let resenasGlobales = [];   // Reseñas cargadas (Tarea 7)
 
 // ==========================================
 // INICIALIZACIÓN Y SEGURIDAD
@@ -421,6 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cargarPedidos();
     cargarClientes();
+    cargarResenas(); // Tarea 7: carga reseñas y el badge de pendientes
     renderDashboard();
 });
 
@@ -487,6 +490,7 @@ function configurarEventos() {
     if (buscadorClientes) buscadorClientes.addEventListener('input', debounce(aplicarFiltrosClientes));
     if (filtroRolClientes) filtroRolClientes.addEventListener('change', aplicarFiltrosClientes);
     if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
+    document.getElementById('filtro-resenas')?.addEventListener('change', dibujarResenas);
 
     if (btnGuardarTasas) btnGuardarTasas.addEventListener('click', guardarTasas);
     if (btnNuevoPago) {
@@ -1275,6 +1279,93 @@ function exportarClientesExcel() {
     const datosLimpios = clientesFiltrados.map(c => ({ "Nombre Completo": c.name || 'Sin nombre', "Correo Electrónico": c.email, "Teléfono": c.phone || 'N/A', "Rol del Sistema": c.role === 'admin' ? 'Administrador' : 'Cliente', "Fecha de Registro": c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A' }));
     const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Directorio"); XLSX.writeFile(libro, "Directorio_Filtrado.xlsx");
 }
+
+// ==========================================
+// TAREA 7: MODERACIÓN DE RESEÑAS
+// ==========================================
+function estrellasAdminHTML(n) {
+    let s = '';
+    for (let i = 1; i <= 5; i++) s += `<i class="ph-fill ph-star ${i <= n ? 'text-yellow-400' : 'text-gray-300'}"></i>`;
+    return s;
+}
+
+window.cargarResenas = async () => {
+    const cont = document.getElementById('admin-resenas-lista');
+    if (cont) cont.innerHTML = '<div class="p-6 text-center text-gray-400"><i class="ph ph-spinner animate-spin text-2xl"></i> Cargando...</div>';
+    try {
+        const snap = await getDocs(reviewsCollection);
+        resenasGlobales = [];
+        snap.forEach(d => { const r = d.data(); r.id = d.id; resenasGlobales.push(r); });
+        resenasGlobales.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        // Badge de pendientes
+        const pendientes = resenasGlobales.filter(r => !r.aprobada).length;
+        const badge = document.getElementById('badge-resenas-pendientes');
+        if (badge) { badge.textContent = pendientes; badge.classList.toggle('hidden', pendientes === 0); }
+
+        dibujarResenas();
+    } catch (e) {
+        console.error("Error cargando reseñas:", e);
+        if (cont) cont.innerHTML = '<div class="p-6 text-center text-red-500">No se pudieron cargar las reseñas.</div>';
+    }
+};
+
+function dibujarResenas() {
+    const cont = document.getElementById('admin-resenas-lista');
+    if (!cont) return;
+    const filtro = document.getElementById('filtro-resenas')?.value || 'pendientes';
+    let lista = resenasGlobales;
+    if (filtro === 'pendientes') lista = resenasGlobales.filter(r => !r.aprobada);
+    else if (filtro === 'aprobadas') lista = resenasGlobales.filter(r => r.aprobada);
+
+    if (lista.length === 0) {
+        cont.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-200">No hay reseñas en esta vista.</div>';
+        return;
+    }
+
+    cont.innerHTML = lista.map(r => {
+        const fecha = r.fecha ? new Date(r.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+        const estadoBadge = r.aprobada
+            ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">Aprobada</span>'
+            : '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full text-xs font-bold">Pendiente</span>';
+        const btnAprobar = r.aprobada
+            ? `<button onclick="reprobarResena('${r.id}')" class="text-xs font-bold text-gray-500 hover:text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg">Ocultar</button>`
+            : `<button onclick="aprobarResena('${r.id}')" class="text-xs font-bold text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg">Aprobar</button>`;
+        return `
+            <div class="bg-white rounded-xl border border-gray-200 p-4">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                        <p class="font-bold text-gray-800 text-sm">${sanitize(r.productoNombre || 'Producto')}</p>
+                        <p class="text-xs text-gray-500">${sanitize(r.clienteNombre || 'Cliente')} · ${fecha}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">${estadoBadge}</div>
+                </div>
+                <div class="mb-2">${estrellasAdminHTML(r.estrellas)}</div>
+                <p class="text-sm text-gray-600 mb-3">${sanitize(r.comentario || '')}</p>
+                <div class="flex justify-end gap-2">
+                    ${btnAprobar}
+                    <button onclick="eliminarResena('${r.id}')" class="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg">Eliminar</button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+window.aprobarResena = async (id) => {
+    try { await updateDoc(doc(db, "reviews", id), { aprobada: true }); showToast("Reseña aprobada. Ya es visible en la tienda.", "success"); cargarResenas(); }
+    catch (e) { showToast("Error al aprobar la reseña.", "error"); console.error(e); }
+};
+
+window.reprobarResena = async (id) => {
+    try { await updateDoc(doc(db, "reviews", id), { aprobada: false }); showToast("Reseña ocultada de la tienda.", "info"); cargarResenas(); }
+    catch (e) { showToast("Error al ocultar la reseña.", "error"); console.error(e); }
+};
+
+window.eliminarResena = async (id) => {
+    showConfirm("¿Eliminar esta reseña permanentemente?", async () => {
+        try { await deleteDoc(doc(db, "reviews", id)); showToast("Reseña eliminada.", "success"); cargarResenas(); }
+        catch (e) { showToast("Error al eliminar la reseña.", "error"); console.error(e); }
+    }, "Eliminar", true);
+};
 
 function cargarPedidos() {
     // Tiempo real: onSnapshot actualiza la tabla automáticamente sin recargar

@@ -71,8 +71,10 @@ function showConfirm(mensaje, onConfirm, textoBtn = 'Confirmar', tipoPeligroso =
 }
 
 let currentUser = null;
-let currentUserData = null; 
-window.productosPublicos = []; 
+let currentUserData = null;
+window.productosPublicos = [];
+let resenaEstrellasSel = 0;      // Tarea 7: estrellas elegidas en el form de reseña
+let currentReviewProdId = null;  // producto cuyo detalle está abierto
 window.categoriasPublicas = []; // Para guardar las subcategorías
 let carritoCompras = []; 
 let subtotalGlobal = 0; 
@@ -1225,6 +1227,7 @@ function setupModalDetalle() {
         }
 
         if(window.cerrarPanelCarrito) window.cerrarPanelCarrito();
+        cargarResenasProducto(prod); // Tarea 7: reseñas del producto
         modal.classList.remove('hidden');
     };
 
@@ -1234,6 +1237,142 @@ function setupModalDetalle() {
         btn.classList.remove('border-transparent'); btn.classList.add('border-brand-blue');
     };
 }
+
+// ==========================================
+// TAREA 7: RESEÑAS DE PRODUCTOS
+// ==========================================
+
+function estrellasHTML(n, size = 'text-base') {
+    let s = '';
+    for (let i = 1; i <= 5; i++) s += `<i class="ph-fill ph-star ${i <= n ? 'text-yellow-400' : 'text-gray-300'} ${size}"></i>`;
+    return s;
+}
+
+async function cargarResenasProducto(prod) {
+    currentReviewProdId = prod.id;
+    resenaEstrellasSel = 0;
+    const resumen = document.getElementById('resenas-resumen');
+    const listaEl = document.getElementById('resenas-lista');
+    const formZona = document.getElementById('resenas-form-zona');
+    if (!resumen || !listaEl) return;
+    resumen.textContent = '';
+    listaEl.innerHTML = '<li class="text-sm text-gray-400">Cargando reseñas...</li>';
+    if (formZona) formZona.innerHTML = '';
+
+    try {
+        const q = query(collection(db, "reviews"), where("productoId", "==", prod.id), where("aprobada", "==", true));
+        const snap = await getDocs(q);
+        const aprobadas = [];
+        snap.forEach(d => { aprobadas.push(d.data()); });
+        aprobadas.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        if (aprobadas.length === 0) {
+            resumen.textContent = 'Sin reseñas aún';
+            listaEl.innerHTML = '<li class="text-sm text-gray-400">Sé el primero en reseñar este producto.</li>';
+        } else {
+            const prom = aprobadas.reduce((s, r) => s + (r.estrellas || 0), 0) / aprobadas.length;
+            resumen.innerHTML = `<span class="inline-flex items-center gap-1">${estrellasHTML(Math.round(prom))} <span class="font-bold text-gray-700 ml-1">${prom.toFixed(1)}</span> <span class="text-gray-400">(${aprobadas.length})</span></span>`;
+            listaEl.innerHTML = aprobadas.map(r => `
+                <li class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-sm text-gray-800">${sanitize(r.clienteNombre || 'Cliente')}</span>
+                        <span class="flex">${estrellasHTML(r.estrellas, 'text-sm')}</span>
+                    </div>
+                    <p class="text-sm text-gray-600">${sanitize(r.comentario || '')}</p>
+                    <p class="text-[11px] text-gray-400 mt-1">${r.fecha ? new Date(r.fecha).toLocaleDateString('es-VE') : ''}</p>
+                </li>`).join('');
+        }
+    } catch (e) {
+        console.warn("Error cargando reseñas:", e);
+        listaEl.innerHTML = '<li class="text-sm text-gray-400">No se pudieron cargar las reseñas.</li>';
+    }
+
+    await renderFormResena(prod);
+}
+
+// Determina si el usuario ya reseñó y si es elegible (pedido Entregado con el producto)
+async function estadoResena(prodId) {
+    let eligible = false, yaReseno = false;
+    try {
+        const qr = query(collection(db, "reviews"), where("productoId", "==", prodId), where("clienteId", "==", currentUser.uid));
+        const rs = await getDocs(qr);
+        yaReseno = !rs.empty;
+        if (yaReseno) return { eligible: false, yaReseno: true };
+
+        const qo = query(collection(db, "orders"), where("clienteId", "==", currentUser.uid), where("estado", "==", "Entregado"));
+        const os = await getDocs(qo);
+        os.forEach(d => {
+            const p = d.data();
+            if (Array.isArray(p.productos) && p.productos.some(it => (it.productoOriginalId || it.id) === prodId)) eligible = true;
+        });
+    } catch (e) { console.warn("Error verificando elegibilidad de reseña:", e); }
+    return { eligible, yaReseno };
+}
+
+async function renderFormResena(prod) {
+    const formZona = document.getElementById('resenas-form-zona');
+    if (!formZona) return;
+    if (!currentUser) {
+        formZona.innerHTML = `<p class="text-sm text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">Inicia sesión y compra este producto para dejar tu reseña.</p>`;
+        return;
+    }
+    formZona.innerHTML = `<p class="text-sm text-gray-400">Verificando si puedes reseñar...</p>`;
+    const { eligible, yaReseno } = await estadoResena(prod.id);
+    if (yaReseno) {
+        formZona.innerHTML = `<p class="text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg p-3"><i class="ph-fill ph-check-circle"></i> Ya dejaste tu reseña de este producto. ¡Gracias!</p>`;
+        return;
+    }
+    if (!eligible) {
+        formZona.innerHTML = `<p class="text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">Podrás reseñar este producto cuando recibas un pedido que lo incluya (estado <b>Entregado</b>).</p>`;
+        return;
+    }
+    resenaEstrellasSel = 0;
+    formZona.innerHTML = `
+        <div class="bg-orange-50 border border-orange-100 rounded-xl p-4">
+            <p class="text-sm font-bold text-gray-800 mb-2">Deja tu reseña</p>
+            <div id="resena-estrellas" class="flex gap-1 mb-3 text-2xl"></div>
+            <textarea id="resena-comentario" rows="2" maxlength="300" placeholder="Cuéntanos qué te pareció..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-orange resize-none mb-2"></textarea>
+            <button type="button" onclick="enviarResena()" class="bg-brand-orange text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-orange-500 transition-colors">Enviar reseña</button>
+        </div>`;
+    renderEstrellasSelector();
+}
+
+function renderEstrellasSelector() {
+    const cont = document.getElementById('resena-estrellas');
+    if (!cont) return;
+    let s = '';
+    for (let i = 1; i <= 5; i++) {
+        s += `<button type="button" onclick="setEstrellaResena(${i})" class="transition-transform hover:scale-110"><i class="ph-fill ph-star ${i <= resenaEstrellasSel ? 'text-yellow-400' : 'text-gray-300'}"></i></button>`;
+    }
+    cont.innerHTML = s;
+}
+window.setEstrellaResena = (n) => { resenaEstrellasSel = n; renderEstrellasSelector(); };
+
+window.enviarResena = async () => {
+    if (!currentUser || !currentReviewProdId) return;
+    const comentario = (document.getElementById('resena-comentario')?.value || '').trim();
+    if (resenaEstrellasSel < 1) { showToast("Elige una calificación de 1 a 5 estrellas.", "warning"); return; }
+    if (!comentario) { showToast("Escribe un breve comentario.", "warning"); return; }
+    const prod = window.productosPublicos.find(p => p.id === currentReviewProdId);
+    try {
+        await addDoc(collection(db, "reviews"), {
+            productoId: currentReviewProdId,
+            productoNombre: prod ? prod.nombre : '',
+            clienteId: currentUser.uid,
+            clienteNombre: currentUserData?.name || 'Cliente',
+            estrellas: resenaEstrellasSel,
+            comentario: comentario,
+            aprobada: false,
+            fecha: new Date().toISOString()
+        });
+        showToast("¡Gracias! Tu reseña fue enviada y se publicará tras revisión.", "success", 5000);
+        const formZona = document.getElementById('resenas-form-zona');
+        if (formZona) formZona.innerHTML = `<p class="text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg p-3"><i class="ph-fill ph-check-circle"></i> Reseña enviada. Se publicará tras revisión. ¡Gracias!</p>`;
+    } catch (e) {
+        console.error("Error enviando reseña:", e);
+        showToast("No se pudo enviar la reseña. Intenta de nuevo.", "error");
+    }
+};
 
 // ==========================================
 // MÓDULO: CARRITO DE COMPRAS Y PROMOCIONES
