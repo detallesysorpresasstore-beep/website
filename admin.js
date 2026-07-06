@@ -492,6 +492,13 @@ function configurarEventos() {
     if (filtroFechaClientes) filtroFechaClientes.addEventListener('change', aplicarFiltrosClientes);
     document.getElementById('filtro-resenas')?.addEventListener('change', dibujarResenas);
 
+    // Importador de catálogo (Excel + imágenes)
+    document.getElementById('btn-importar-catalogo')?.addEventListener('click', abrirModalImportar);
+    document.getElementById('btn-cerrar-importar')?.addEventListener('click', () => document.getElementById('modal-importar-catalogo').classList.add('hidden'));
+    document.getElementById('btn-cancelar-importar')?.addEventListener('click', () => document.getElementById('modal-importar-catalogo').classList.add('hidden'));
+    document.getElementById('btn-analizar-importar')?.addEventListener('click', analizarImportacion);
+    document.getElementById('btn-ejecutar-importar')?.addEventListener('click', ejecutarImportacion);
+
     if (btnGuardarTasas) btnGuardarTasas.addEventListener('click', guardarTasas);
     if (btnNuevoPago) {
         btnNuevoPago.addEventListener('click', () => {
@@ -1366,6 +1373,293 @@ window.eliminarResena = async (id) => {
         catch (e) { showToast("Error al eliminar la reseña.", "error"); console.error(e); }
     }, "Eliminar", true);
 };
+
+// ==========================================
+// IMPORTADOR DE CATÁLOGO (Excel + imágenes -> productos)
+// ==========================================
+// Estructura del Excel: cada producto = 2 filas.
+//   Fila identidad: B Categoria, C Genero, D SubCat, E Nombre, F Desc,
+//                   I Color, J Precio, K-O tallas, Q Link.
+//   Fila siguiente: K-O cantidades por talla, Q otro Link (opcional).
+// Cada color es un producto aparte. Las imágenes son archivos locales
+// (columna Link = hipervínculo/ruta); se suben a ImgBB una sola vez (dedup).
+let impProductos = [];        // productos parseados del Excel
+let impImagenes = null;       // índice de archivos de la carpeta elegida
+let impListoParaImportar = false;
+
+function abrirModalImportar() {
+    impProductos = []; impImagenes = null; impListoParaImportar = false;
+    document.getElementById('imp-excel').value = '';
+    document.getElementById('imp-imagenes').value = '';
+    const res = document.getElementById('imp-resultado'); res.classList.add('hidden'); res.textContent = '';
+    document.getElementById('imp-progreso').classList.add('hidden');
+    document.getElementById('btn-ejecutar-importar').disabled = true;
+    document.getElementById('modal-importar-catalogo').classList.remove('hidden');
+}
+
+function impCelda(ws, r, c) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c })];
+    if (!cell) return { v: null, link: null };
+    const v = (cell.v !== undefined && cell.v !== null && cell.v !== '') ? cell.v : (cell.w || null);
+    const link = (cell.l && cell.l.Target) ? cell.l.Target : null;
+    return { v, link };
+}
+
+function impNormLink(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    let s = String(raw).trim();
+    try { s = decodeURIComponent(s); } catch (e) { /* ruta con % suelto */ }
+    s = s.replace(/\\/g, '/').toLowerCase();
+    const i = s.indexOf('ml detallitos/');
+    if (i !== -1) s = s.slice(i + 'ml detallitos/'.length);
+    return s;
+}
+
+function impIndexarImagenes(fileList) {
+    const byPath = new Map();
+    const byName = new Map();
+    for (const f of fileList) {
+        if (!/\.(png|jpe?g|webp)$/i.test(f.name)) continue;
+        let rel = (f.webkitRelativePath || f.name).replace(/\\/g, '/').toLowerCase();
+        const i = rel.indexOf('ml detallitos/');
+        if (i !== -1) rel = rel.slice(i + 'ml detallitos/'.length);
+        byPath.set(rel, f);
+        const name = rel.split('/').pop();
+        if (!byName.has(name)) byName.set(name, []);
+        byName.get(name).push({ path: rel, f });
+    }
+    return { byPath, byName };
+}
+
+function impMatch(link) {
+    if (!impImagenes || !link) return null;
+    if (impImagenes.byPath.has(link)) return impImagenes.byPath.get(link);
+    const fname = link.split('/').pop();
+    const folder = link.split('/').slice(0, -1).join('/');
+    const cands = impImagenes.byName.get(fname);
+    if (cands && cands.length) {
+        const same = cands.find(c => c.path.startsWith(folder + '/'));
+        return (same || cands[0]).f;
+    }
+    // fuzzy: nombre real que sea sufijo/prefijo del nombre del link
+    let best = null;
+    for (const [nm, arr] of impImagenes.byName) {
+        if (fname.endsWith(nm) || nm.endsWith(fname)) {
+            for (const c of arr) {
+                const sameFolder = c.path.startsWith(folder + '/');
+                if (!best || (sameFolder && !best.sameFolder)) best = { f: c.f, sameFolder };
+            }
+        }
+    }
+    return best ? best.f : null;
+}
+
+function impParsearExcel(ws) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const productos = [];
+    for (let r = range.s.r; r <= range.e.r; r++) {
+        const nombreCell = impCelda(ws, r, 4).v; // E
+        if (!nombreCell) continue;
+        if (String(nombreCell).trim().toLowerCase() === 'nombre') continue; // encabezado
+        const cat = impCelda(ws, r, 1).v, gen = impCelda(ws, r, 2).v, sub = impCelda(ws, r, 3).v;
+        const desc = impCelda(ws, r, 5).v, color = impCelda(ws, r, 8).v, precio = impCelda(ws, r, 9).v;
+        // tallas (fila r) + cantidades (fila r+1), columnas K-O (10-14)
+        const variantes = [];
+        for (let c = 10; c <= 14; c++) {
+            const talla = impCelda(ws, r, c).v;
+            const cant = impCelda(ws, r + 1, c).v;
+            if (talla !== null && talla !== '' && cant !== null && cant !== '') {
+                variantes.push({ id: genVarId(), nombre: String(talla).trim(), stock: parseInt(cant) || 0 });
+            }
+        }
+        // links de Q (16) en fila r y r+1
+        const links = [];
+        for (const rr of [r, r + 1]) {
+            const cel = impCelda(ws, rr, 16);
+            const k = impNormLink(cel.link || cel.v);
+            if (k && !links.includes(k)) links.push(k);
+        }
+        productos.push({
+            cat: cat ? String(cat).trim() : '',
+            gen: gen ? String(gen).trim() : '',
+            sub: sub ? String(sub).trim() : 'General',
+            nombre: String(nombreCell).trim(),
+            desc: desc ? String(desc).trim() : '',
+            color: color ? String(color).trim() : '',
+            precio: parseFloat(precio) || 0,
+            variantes, links
+        });
+    }
+    return productos;
+}
+
+async function analizarImportacion() {
+    const fileExcel = document.getElementById('imp-excel').files[0];
+    const filesImg = document.getElementById('imp-imagenes').files;
+    const res = document.getElementById('imp-resultado');
+    res.classList.remove('hidden');
+    res.textContent = 'Analizando...';
+    if (!fileExcel) { res.textContent = 'Falta seleccionar el archivo Excel.'; return; }
+    if (!filesImg || filesImg.length === 0) { res.textContent = 'Falta seleccionar la carpeta de imágenes.'; return; }
+
+    try {
+        const buf = await fileExcel.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        impProductos = impParsearExcel(ws);
+        impImagenes = impIndexarImagenes(filesImg);
+
+        // Emparejar imágenes y detectar faltantes
+        const sinImagen = [];
+        const rutasUnicas = new Set();
+        for (const p of impProductos) {
+            let encontroAlguna = false;
+            for (const l of p.links) {
+                const f = impMatch(l);
+                if (f) { rutasUnicas.add(l); encontroAlguna = true; }
+            }
+            if (p.links.length === 0 || !encontroAlguna) sinImagen.push(`${p.nombre} (${p.color})`);
+        }
+        const totalTallas = impProductos.reduce((s, p) => s + p.variantes.length, 0);
+
+        let txt = '';
+        txt += `Productos a crear:        ${impProductos.length}\n`;
+        txt += `Imágenes distintas a subir: ${rutasUnicas.size}\n`;
+        txt += `Total de filas de talla:  ${totalTallas}\n`;
+        txt += `Productos sin imagen:     ${sinImagen.length}\n`;
+        if (sinImagen.length) txt += `   → ${sinImagen.slice(0, 12).join(', ')}${sinImagen.length > 12 ? '…' : ''}\n`;
+        txt += `\nEjemplos:\n`;
+        for (const p of impProductos.slice(0, 4)) {
+            const cat = document.getElementById('imp-categoria').value === 'excel' ? p.cat : ('Ropa ' + impGeneroPlural(p.gen));
+            txt += `• ${p.nombre}${p.color ? ' — ' + p.color : ''}\n  ${cat} / ${p.sub} | $${p.precio} | tallas: ${p.variantes.map(v => v.nombre + '(' + v.stock + ')').join(', ') || '—'} | fotos: ${p.links.filter(l => impMatch(l)).length}\n`;
+        }
+        res.textContent = txt;
+
+        impListoParaImportar = impProductos.length > 0;
+        document.getElementById('btn-ejecutar-importar').disabled = !impListoParaImportar;
+    } catch (e) {
+        console.error(e);
+        res.textContent = 'Error analizando el archivo: ' + e.message;
+    }
+}
+
+function impGeneroPlural(gen) {
+    const g = (gen || '').toLowerCase();
+    if (g.startsWith('niña')) return 'Niñas';
+    if (g.startsWith('niño')) return 'Niños';
+    if (g.startsWith('unisex')) return 'Unisex';
+    return gen || '';
+}
+
+async function impSubirImgBB(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    const r = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
+    const data = await r.json();
+    if (data && data.success) return data.data.url;
+    throw new Error('ImgBB rechazó la imagen');
+}
+
+function ejecutarImportacion() {
+    if (!impListoParaImportar) return;
+    showConfirm(
+        `Se crearán ${impProductos.length} productos nuevos en la tienda. Revisa el resumen del análisis. ¿Continuar con la importación?`,
+        () => _importarAhora(),
+        "Sí, importar",
+        false
+    );
+}
+
+async function _importarAhora() {
+    const btn = document.getElementById('btn-ejecutar-importar');
+    const btnAnalizar = document.getElementById('btn-analizar-importar');
+    const prog = document.getElementById('imp-progreso');
+    const barra = document.getElementById('imp-barra');
+    const progTxt = document.getElementById('imp-progreso-txt');
+    btn.disabled = true; btnAnalizar.disabled = true;
+    prog.classList.remove('hidden');
+
+    const modoCategoria = document.getElementById('imp-categoria').value; // 'excel' | 'ropa-genero'
+    const portada = document.getElementById('imp-portada').value;         // 'individual' | 'grupo'
+
+    // Cuántas veces se usa cada link (para saber cuál es "de grupo" = compartido)
+    const usoLink = {};
+    impProductos.forEach(p => p.links.forEach(l => { usoLink[l] = (usoLink[l] || 0) + 1; }));
+
+    // 1) Subir imágenes únicas (dedup)
+    const rutasUnicas = [...new Set(impProductos.flatMap(p => p.links.filter(l => impMatch(l))))];
+    const urlPorRuta = new Map();
+    let subidas = 0, fallosImg = 0;
+    for (const ruta of rutasUnicas) {
+        const f = impMatch(ruta);
+        progTxt.textContent = `Subiendo imágenes ${subidas + 1}/${rutasUnicas.length}...`;
+        try { urlPorRuta.set(ruta, await impSubirImgBB(f)); }
+        catch (e) { fallosImg++; console.warn('Fallo subiendo', ruta, e); }
+        subidas++;
+        barra.style.width = `${Math.round((subidas / rutasUnicas.length) * 50)}%`;
+    }
+
+    // 2) Crear productos
+    let creados = 0, fallosProd = 0;
+    for (let idx = 0; idx < impProductos.length; idx++) {
+        const p = impProductos[idx];
+        progTxt.textContent = `Creando productos ${idx + 1}/${impProductos.length}...`;
+        try {
+            // ordenar imágenes según portada: individual = link menos compartido
+            const linksConUrl = p.links.filter(l => urlPorRuta.has(l));
+            linksConUrl.sort((a, b) => portada === 'individual' ? (usoLink[a] - usoLink[b]) : (usoLink[b] - usoLink[a]));
+            const imagenes = linksConUrl.map(l => urlPorRuta.get(l));
+
+            const categoria = modoCategoria === 'excel' ? (p.cat || 'Ropa') : ('Ropa ' + impGeneroPlural(p.gen));
+            const tieneTallas = p.variantes.length > 0;
+            const stock = tieneTallas ? p.variantes.reduce((s, v) => s + v.stock, 0) : 0;
+            const nombre = p.nombre + (p.color ? ` — ${p.color}` : '');
+
+            await addDoc(productsCollection, {
+                nombre, categoria, subcategoria: p.sub || 'General',
+                precio: p.precio, stock,
+                descripcion: p.desc,
+                tipoVariante: tieneTallas ? 'talla' : 'ninguno',
+                variantes: p.variantes,
+                imagenes,
+                descuento: 0,
+                fechaCreacion: new Date().toISOString(),
+                fechaActualizacion: new Date().toISOString()
+            });
+            creados++;
+        } catch (e) { fallosProd++; console.error('Fallo creando', p.nombre, e); }
+        barra.style.width = `${50 + Math.round(((idx + 1) / impProductos.length) * 50)}%`;
+    }
+
+    // 3) Asegurar categorías/subcategorías nuevas
+    try { await impAsegurarCategorias(modoCategoria); } catch (e) { console.warn('No se pudieron crear categorías:', e); }
+
+    progTxt.textContent = `Listo: ${creados} productos creados. ${fallosProd ? fallosProd + ' con error. ' : ''}${fallosImg ? fallosImg + ' imágenes fallaron.' : ''}`;
+    showToast(`Importación finalizada: ${creados} productos creados.`, creados > 0 ? 'success' : 'warning', 6000);
+    btnAnalizar.disabled = false;
+    cargarProductos();
+    cargarCategorias();
+}
+
+async function impAsegurarCategorias(modoCategoria) {
+    // Junta categoria -> set de subcategorias desde lo importado
+    const mapa = {};
+    for (const p of impProductos) {
+        const cat = modoCategoria === 'excel' ? (p.cat || 'Ropa') : ('Ropa ' + impGeneroPlural(p.gen));
+        if (!mapa[cat]) mapa[cat] = new Set();
+        if (p.sub) mapa[cat].add(p.sub);
+    }
+    for (const [nombre, subsSet] of Object.entries(mapa)) {
+        const subs = [...subsSet];
+        const existente = categoriasGlobales.find(c => c.nombre === nombre);
+        if (!existente) {
+            await addDoc(categoriesCollection, { nombre, icono: 'ph-t-shirt', subcategorias: subs });
+        } else {
+            const faltan = subs.filter(s => !(existente.subcategorias || []).includes(s));
+            if (faltan.length) await updateDoc(doc(db, "categories", existente.id), { subcategorias: [...(existente.subcategorias || []), ...faltan] });
+        }
+    }
+}
 
 function cargarPedidos() {
     // Tiempo real: onSnapshot actualiza la tabla automáticamente sin recargar

@@ -185,6 +185,9 @@
                         </div>
                     </div>
                     <div class="flex flex-col sm:flex-row w-full lg:w-auto gap-3 shrink-0">
+                        <button id="btn-importar-catalogo" class="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                            <i class="ph ph-upload-simple text-xl"></i> Importar catálogo
+                        </button>
                         <button id="btn-exportar-productos" class="w-full sm:w-auto bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2 shadow-sm">
                             <i class="ph ph-file-xls text-xl"></i> Exportar
                         </button>
@@ -933,6 +936,56 @@
                 <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
                     <button onclick="cerrarModalLimpieza()" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
                     <button id="btn-confirmar-limpieza" type="button" onclick="ejecutarLimpiezaHistorial()" class="px-5 py-2 bg-red-500 text-white font-bold hover:bg-red-600 rounded-lg shadow-sm">Eliminar Pedidos</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: Importar catálogo (Excel + imágenes) -->
+        <div id="modal-importar-catalogo" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph-fill ph-upload-simple text-purple-600 text-2xl"></i> Importar catálogo desde Excel</h3>
+                    <button id="btn-cerrar-importar" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-x text-2xl"></i></button>
+                </div>
+                <div class="p-6 overflow-y-auto space-y-5">
+                    <div class="text-sm text-gray-600 bg-purple-50 border border-purple-100 rounded-lg p-3">
+                        Sube el <b>Excel de inventario</b> y selecciona la <b>carpeta de imágenes</b>. Pulsa <b>Analizar</b> para ver el resumen; <b>nada se crea</b> hasta que confirmes con <b>Importar</b>.
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">1. Archivo Excel (.xlsx)</label>
+                        <input type="file" id="imp-excel" accept=".xlsx" class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:font-bold hover:file:bg-purple-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">2. Carpeta de imágenes</label>
+                        <input type="file" id="imp-imagenes" webkitdirectory directory multiple class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-200 file:text-gray-700 file:font-bold hover:file:bg-gray-300">
+                        <p class="text-xs text-gray-400 mt-1">Selecciona la carpeta "ML Detallitos" completa.</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Portada (si hay 2 fotos)</label>
+                            <select id="imp-portada" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                <option value="individual">Foto individual del color</option>
+                                <option value="grupo">Foto de grupo/conjunto</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Categoría del producto</label>
+                            <select id="imp-categoria" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                                <option value="ropa-genero">"Ropa " + Género (Ropa Niñas)</option>
+                                <option value="excel">Tal cual el Excel (col. Categoría)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="imp-resultado" class="hidden text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-xs"></div>
+                    <div id="imp-progreso" class="hidden">
+                        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden"><div id="imp-barra" class="bg-purple-600 h-3 w-0 transition-all"></div></div>
+                        <p id="imp-progreso-txt" class="text-xs text-gray-500 mt-1"></p>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                    <button id="btn-cancelar-importar" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cerrar</button>
+                    <button id="btn-analizar-importar" type="button" class="px-5 py-2 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-800">Analizar</button>
+                    <button id="btn-ejecutar-importar" type="button" disabled class="px-5 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed">Importar</button>
                 </div>
             </div>
         </div>
