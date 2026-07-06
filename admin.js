@@ -1448,6 +1448,68 @@ async function ajustarStockItem(item, signo) {
     }
 }
 
+// ==========================================
+// TAREA 4: NOTIFICAR AL CLIENTE POR WHATSAPP (wa.me)
+// ==========================================
+// Normaliza el teléfono para wa.me (solo dígitos, con código de país).
+// Heurística Venezuela: 0412... -> 58412...
+function normalizarTelefonoWa(tel) {
+    let d = (tel || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('58')) return d;
+    if (d.startsWith('0')) return '58' + d.slice(1);
+    return d;
+}
+
+function mensajeWhatsAppPedido(pedido, estado, tracking) {
+    const idCorto = '#' + pedido.id.slice(-6).toUpperCase();
+    const nombre = pedido.clienteNombre || '';
+    const tienda = '*Detalles y Sorpresas STORE*';
+    const saludo = `¡Hola ${nombre}! 👋`;
+    let cuerpo;
+    switch (estado) {
+        case 'Enviado':
+            cuerpo = `Tu pedido ${idCorto} de ${tienda} ya fue *enviado* 🚚.`;
+            if (tracking) cuerpo += ` Tu número de guía es: *${tracking}*.`;
+            cuerpo += ` ¡Pronto lo tendrás contigo!`;
+            break;
+        case 'Entregado':
+            cuerpo = `Tu pedido ${idCorto} de ${tienda} fue marcado como *entregado* ✅. ¡Gracias por tu compra! 💖`;
+            break;
+        case 'Procesando':
+            cuerpo = `Tu pedido ${idCorto} de ${tienda} está *en preparación* 📦. Te avisamos cuando salga.`;
+            break;
+        case 'Cancelado':
+            cuerpo = `Tu pedido ${idCorto} de ${tienda} fue *cancelado*. Si tienes dudas, respóndenos por aquí.`;
+            break;
+        default:
+            cuerpo = `Recibimos tu pedido ${idCorto} en ${tienda} y está *pendiente por confirmar*. Te avisamos apenas avance.`;
+    }
+    return `${saludo}\n\n${cuerpo}`;
+}
+
+window.notificarPedidoWhatsApp = () => {
+    const id = document.getElementById('ped-id').value;
+    const pedido = pedidosGlobales.find(p => p.id === id);
+    if (!pedido) { showToast("No se encontró el pedido.", "error"); return; }
+
+    // Teléfono: primero el guardado en la orden; si no, buscar en el directorio de clientes por email
+    let telRaw = pedido.clienteTelefono || '';
+    if (!telRaw && pedido.clienteEmail) {
+        const cliente = clientesGlobales.find(c => (c.email || '').toLowerCase() === pedido.clienteEmail.toLowerCase());
+        if (cliente) telRaw = cliente.phone || '';
+    }
+    const telefono = normalizarTelefonoWa(telRaw);
+    if (!telefono) { showToast("Este cliente no tiene un teléfono registrado para WhatsApp.", "warning"); return; }
+
+    // Estado y tracking según lo que se ve en el modal
+    const estado = document.getElementById('ped-estado').value || pedido.estado;
+    const tracking = (document.getElementById('input-tracking-numero')?.value.trim()) || pedido.trackingNumero || '';
+
+    const mensaje = mensajeWhatsAppPedido(pedido, estado, tracking);
+    window.open(`https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`, '_blank');
+};
+
 window.actualizarEstadoPedido = async () => {
     const id = document.getElementById('ped-id').value; 
     const nuevoEstado = document.getElementById('ped-estado').value; 
@@ -1484,12 +1546,17 @@ window.actualizarEstadoPedido = async () => {
         };
         datosActualizar.historial = [...historialPrevio, historialEntry];
 
-        await updateDoc(orderRef, datosActualizar); 
-        document.getElementById('modal-pedido').classList.add('hidden'); 
-        showToast("Estado del pedido actualizado.", "success");
-        cargarPedidos(); 
-        cargarProductos(); 
-        
+        await updateDoc(orderRef, datosActualizar);
+        // Si es Enviado/Entregado, dejamos el modal abierto para poder notificar por WhatsApp
+        if (nuevoEstado === 'Enviado' || nuevoEstado === 'Entregado') {
+            showToast("Pedido actualizado. Ahora puedes notificar al cliente por WhatsApp 👇", "info", 6000);
+        } else {
+            document.getElementById('modal-pedido').classList.add('hidden');
+            showToast("Estado del pedido actualizado.", "success");
+        }
+        cargarPedidos();
+        cargarProductos();
+
     } catch (error) { 
         showToast("Error al actualizar el estado del pedido.", "error"); 
         console.error(error); 

@@ -223,6 +223,8 @@ function monitorAuthState() {
                     // Cargar favoritos del usuario
                     favoritosUsuario = new Set(currentUserData.favoritos || []);
                     actualizarBotonesFavoritos();
+                    // Tarea 6: fusionar carrito local con el de la nube
+                    await sincronizarCarritoAlIniciarSesion(user.uid);
                 }
             } catch (err) {
                 console.warn("No se pudieron cargar los datos del perfil:", err);
@@ -1245,8 +1247,46 @@ function cargarCarritoLocal() {
 
 function guardarCarritoLocal() {
     localStorage.setItem('ds_carrito', JSON.stringify(carritoCompras));
-    localStorage.setItem('ds_carrito_time', Date.now().toString()); // NUEVO: Guardamos el reloj
+    localStorage.setItem('ds_carrito_time', Date.now().toString()); // reloj para la fusión
     renderizarCarrito();
+    guardarCarritoFirestore(); // Tarea 6: sincroniza a la nube si hay sesión (fire-and-forget)
+}
+
+// ==========================================
+// TAREA 6: CARRITO SINCRONIZADO EN FIRESTORE
+// ==========================================
+async function guardarCarritoFirestore() {
+    if (!currentUser) return;
+    try {
+        await setDoc(doc(db, "users", currentUser.uid),
+            { carrito: carritoCompras, carritoTime: Date.now() },
+            { merge: true });
+    } catch (e) { console.warn("No se pudo guardar el carrito en la nube:", e); }
+}
+
+// Al iniciar sesión: fusiona el carrito local con el de Firestore.
+// En conflicto (misma línea en ambos) gana el carrito más reciente; las
+// líneas que faltan en uno se agregan desde el otro (no se pierde nada).
+async function sincronizarCarritoAlIniciarSesion(uid) {
+    try {
+        const snap = await getDoc(doc(db, "users", uid));
+        const remoto = (snap.exists() && Array.isArray(snap.data().carrito)) ? snap.data().carrito : [];
+        const remotoTime = (snap.exists() && snap.data().carritoTime) ? snap.data().carritoTime : 0;
+        const local = Array.isArray(carritoCompras) ? carritoCompras : [];
+        const localTime = parseInt(localStorage.getItem('ds_carrito_time') || '0');
+
+        if (remoto.length === 0 && local.length === 0) return;
+
+        const localGana = localTime >= remotoTime;
+        const base = localGana ? local : remoto;
+        const otro = localGana ? remoto : local;
+        const mapa = new Map(base.map(it => [it.id, { ...it }]));
+        for (const it of otro) {
+            if (!mapa.has(it.id)) mapa.set(it.id, { ...it });
+        }
+        carritoCompras = [...mapa.values()];
+        guardarCarritoLocal(); // persiste local + timestamp + render + nube
+    } catch (e) { console.warn("No se pudo sincronizar el carrito:", e); }
 }
 
 // NUEVO: Estrategia de Carrito Abandonado
@@ -1726,6 +1766,7 @@ function setupCheckout() {
                         clienteId: currentUser.uid,
                         clienteNombre: currentUserData ? currentUserData.name : 'Cliente',
                         clienteEmail: currentUser.email,
+                        clienteTelefono: (currentUserData && currentUserData.phone) ? currentUserData.phone : '',
                         direccion: direccion,
                         metodoPago: metodoConfig.nombre,
                         referencia: referencia || 'N/A',
