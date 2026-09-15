@@ -191,6 +191,10 @@
                         <button id="btn-exportar-productos" class="w-full sm:w-auto bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2 shadow-sm">
                             <i class="ph ph-file-xls text-xl"></i> Exportar
                         </button>
+                        <button id="btn-actualizar-excel" class="w-full sm:w-auto bg-teal-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-teal-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                            <i class="ph ph-arrows-clockwise text-xl"></i> Actualizar desde Excel
+                        </button>
+                        <input type="file" id="input-actualizar-excel" accept=".xlsx,.xls" class="hidden" onchange="procesarActualizacionExcel(event)">
                         <button id="btn-nuevo-producto" class="w-full sm:w-auto bg-brand-blue text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-500 transition-colors flex items-center justify-center gap-2 shadow-sm">
                             <i class="ph ph-plus-circle text-xl"></i> Nuevo Producto
                         </button>

@@ -463,6 +463,7 @@ function configurarEventos() {
     document.getElementById('prod-tipo-inventario')?.addEventListener('change', () => { variantesProducto = []; aplicarTipoInventario(); });
     btnGuardarProducto.addEventListener('click', guardarProducto);
     if (btnExportarProductos) btnExportarProductos.addEventListener('click', exportarProductosExcel);
+    document.getElementById('btn-actualizar-excel')?.addEventListener('click', () => document.getElementById('input-actualizar-excel')?.click());
     selectProdCategoria.addEventListener('change', (e) => actualizarSelectSubcategoriasFormulario(e.target.value));
     buscadorProductos.addEventListener('input', debounce(aplicarFiltrosProductos));
     filtroCategoria.addEventListener('change', () => { actualizarSelectSubcategoriasFiltro(); aplicarFiltrosProductos(); });
@@ -1247,11 +1248,129 @@ window.duplicarProducto = (id) => {
 
 window.eliminarProducto = async (id) => { showConfirm("¿Seguro que deseas eliminar este producto?", async () => { await deleteDoc(doc(db, "products", id)); cargarProductos(); showToast("Producto eliminado.", "success"); }, "Eliminar", true); };
 
-function exportarProductosExcel() {
-    if (productosFiltrados.length === 0) return alert("No hay productos para exportar.");
-    const datosLimpios = productosFiltrados.map(p => ({ "ID Producto": p.id, "Nombre": p.nombre, "Categoría": p.categoria, "Subcategoría": p.subcategoria, "Precio ($)": p.precio, "Stock Físico": p.stock, "Descripción": p.descripcion || 'N/A', "Cantidad de Fotos": p.imagenes ? p.imagenes.length : 0, "Fecha de Registro": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString() : 'N/A' }));
-    const hoja = XLSX.utils.json_to_sheet(datosLimpios); const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, hoja, "Inventario"); XLSX.writeFile(libro, "Inventario_Filtrado.xlsx");
+// Serializa las tallas/edades: "S:5 | M:3 | L:2"
+function serializarVariantes(p) {
+    if (!Array.isArray(p.variantes) || p.variantes.length === 0) return '';
+    return p.variantes.map(v => `${v.nombre}:${v.stock}`).join(' | ');
 }
+
+// Exporta TODA la info del producto en formato re-importable (una fila por producto)
+function exportarProductosExcel() {
+    const lista = productosFiltrados.length ? productosFiltrados : productosGlobales;
+    if (!lista.length) { showToast("No hay productos para exportar.", "warning"); return; }
+    const filas = lista.map(p => ({
+        "ID (no modificar)": p.id,
+        "Nombre": p.nombre || '',
+        "Categoria": p.categoria || '',
+        "Subcategoria": p.subcategoria || '',
+        "Precio": p.precio != null ? p.precio : 0,
+        "Descripcion": p.descripcion || '',
+        "Tipo Inventario": p.tipoVariante || 'ninguno',
+        "Stock": p.stock != null ? p.stock : 0,
+        "Tallas o Edades (nombre:stock | ...)": serializarVariantes(p),
+        "Descuento %": p.descuento || 0,
+        "Imagenes (url | url)": Array.isArray(p.imagenes) ? p.imagenes.join(' | ') : '',
+        "Creado": p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleDateString('es-VE') : ''
+    }));
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    hoja['!cols'] = [{ wch: 24 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 8 }, { wch: 40 }, { wch: 14 }, { wch: 8 }, { wch: 28 }, { wch: 10 }, { wch: 50 }, { wch: 12 }];
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Productos");
+    XLSX.writeFile(libro, `Productos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast(`Exportados ${filas.length} productos.`, "success");
+}
+
+// Re-importa el Excel exportado y ACTUALIZA por ID (o crea si la fila no tiene ID)
+window.procesarActualizacionExcel = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: 'array' });
+        const hoja = wb.Sheets[wb.SheetNames[0]];
+        const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+        event.target.value = '';
+        if (!filas.length) { showToast("El archivo está vacío.", "warning"); return; }
+
+        // Lee una columna por el inicio de su nombre (tolerante a los sufijos del encabezado)
+        const get = (fila, ...claves) => {
+            const keys = Object.keys(fila);
+            for (const c of claves) {
+                const k = keys.find(kk => kk.toLowerCase().startsWith(c.toLowerCase()));
+                if (k !== undefined) return fila[k];
+            }
+            return '';
+        };
+
+        const ops = filas.map(fila => {
+            const id = String(get(fila, 'id') || '').trim();
+            const nombre = String(get(fila, 'nombre') || '').trim();
+            const categoria = String(get(fila, 'categoria') || '').trim();
+            const subcategoria = String(get(fila, 'subcategoria') || 'General').trim();
+            const precio = parseFloat(get(fila, 'precio')) || 0;
+            const descripcion = String(get(fila, 'descripcion') || '').trim();
+            let tipo = String(get(fila, 'tipo inventario', 'tipo') || 'ninguno').trim().toLowerCase();
+            if (!['ninguno', 'talla', 'edad'].includes(tipo)) tipo = 'ninguno';
+            const descuento = parseInt(get(fila, 'descuento')) || 0;
+            const imagenes = String(get(fila, 'imagenes') || '').split('|').map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+            const tallasRaw = String(get(fila, 'tallas', 'edades') || '').trim();
+            let variantes = [];
+            if (tallasRaw) {
+                variantes = tallasRaw.split('|').map(seg => {
+                    const s = seg.trim(); if (!s) return null;
+                    const i = s.lastIndexOf(':');
+                    const nom = (i === -1 ? s : s.slice(0, i)).trim();
+                    const st = i === -1 ? 0 : (parseInt(s.slice(i + 1)) || 0);
+                    return nom ? { nombre: nom, stock: st } : null;
+                }).filter(Boolean);
+            }
+            if (variantes.length === 0) tipo = 'ninguno';
+            let stock = parseInt(get(fila, 'stock')) || 0;
+            if (tipo !== 'ninguno') stock = variantes.reduce((a, v) => a + v.stock, 0);
+            return { id, nombre, categoria, subcategoria, precio, descripcion, tipo, descuento, imagenes, variantes, stock };
+        }).filter(o => o.nombre);
+
+        const aActualizar = ops.filter(o => o.id).length;
+        const aCrear = ops.filter(o => !o.id).length;
+        if (aActualizar + aCrear === 0) { showToast("No se encontraron filas válidas (falta Nombre).", "warning"); return; }
+
+        showConfirm(
+            `Se ACTUALIZARÁN ${aActualizar} producto(s) por su ID${aCrear ? ` y se CREARÁN ${aCrear} nuevo(s) (filas sin ID)` : ''}. ¿Continuar?`,
+            async () => {
+                let act = 0, cre = 0, err = 0;
+                for (const o of ops) {
+                    try {
+                        // Conservar los IDs de variantes existentes (por nombre) para no romper pedidos/carritos
+                        let variantes = o.variantes.map(v => ({ ...v }));
+                        if (o.tipo !== 'ninguno') {
+                            const actual = o.id ? productosGlobales.find(p => p.id === o.id) : null;
+                            const prev = (actual && Array.isArray(actual.variantes)) ? actual.variantes : [];
+                            variantes = o.variantes.map(v => {
+                                const m = prev.find(x => x.nombre === v.nombre);
+                                return { id: m ? m.id : genVarId(), nombre: v.nombre, stock: v.stock };
+                            });
+                        }
+                        const datos = {
+                            nombre: o.nombre, categoria: o.categoria, subcategoria: o.subcategoria,
+                            precio: o.precio, descripcion: o.descripcion,
+                            tipoVariante: o.tipo, variantes, stock: o.stock,
+                            descuento: o.descuento, imagenes: o.imagenes,
+                            fechaActualizacion: new Date().toISOString()
+                        };
+                        if (o.id) { await updateDoc(doc(db, "products", o.id), datos); act++; }
+                        else { datos.fechaCreacion = new Date().toISOString(); await addDoc(productsCollection, datos); cre++; }
+                    } catch (e) { err++; console.error("Fila con error:", o.nombre, e); }
+                }
+                showToast(`Actualizados: ${act}. Creados: ${cre}.${err ? ` Con error: ${err}.` : ''}`, err ? 'warning' : 'success', 6000);
+                cargarProductos();
+            },
+            "Sí, actualizar", false
+        );
+    } catch (e) {
+        console.error(e);
+        showToast("Error leyendo el archivo Excel.", "error");
+    }
+};
 
 async function cargarClientes() {
     try { const querySnapshot = await getDocs(usersCollection); clientesGlobales = []; querySnapshot.forEach((docSnap) => { const u = docSnap.data(); u.uid = docSnap.id; clientesGlobales.push(u); }); aplicarFiltrosClientes(); } catch (error) { console.error(error); }
