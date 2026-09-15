@@ -1253,7 +1253,7 @@ function exportarProductosExcel() {
 }
 
 async function cargarClientes() {
-    try { const querySnapshot = await getDocs(usersCollection); clientesGlobales = []; querySnapshot.forEach((docSnap) => { clientesGlobales.push(docSnap.data()); }); aplicarFiltrosClientes(); } catch (error) { console.error(error); }
+    try { const querySnapshot = await getDocs(usersCollection); clientesGlobales = []; querySnapshot.forEach((docSnap) => { const u = docSnap.data(); u.uid = docSnap.id; clientesGlobales.push(u); }); aplicarFiltrosClientes(); } catch (error) { console.error(error); }
 }
 
 function aplicarFiltrosClientes() {
@@ -1269,17 +1269,44 @@ function aplicarFiltrosClientes() {
 
 function dibujarTablaClientes(arreglo) {
     const tbody = document.getElementById('admin-clients-list'); 
-    if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No se encontraron clientes.</td></tr>'; return; }
-    
+    if (arreglo.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-500">No se encontraron clientes.</td></tr>'; return; }
+
+    const miUid = auth.currentUser ? auth.currentUser.uid : null;
     let htmlTemporal = '';
     arreglo.forEach((user) => {
         const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
         const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
         const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${sanitize(user.name || 'Sin Nombre')}</td><td class="p-4 text-gray-600">${sanitize(user.email)}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td></tr>`;
+        const accion = (user.uid && user.uid === miUid)
+            ? '<span class="text-xs text-gray-400 italic">Tú</span>'
+            : `<button onclick="eliminarCliente('${user.uid}')" title="Eliminar cliente" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button>`;
+        htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${sanitize(user.name || 'Sin Nombre')}</td><td class="p-4 text-gray-600">${sanitize(user.email)}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td><td class="p-4 text-center">${accion}</td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
+
+window.eliminarCliente = (uid) => {
+    const u = clientesGlobales.find(c => c.uid === uid);
+    if (!u) return;
+    if (auth.currentUser && auth.currentUser.uid === uid) {
+        showToast("No puedes eliminar tu propia cuenta de administrador.", "warning");
+        return;
+    }
+    const nombre = sanitize(u.name || u.email || 'este cliente');
+    const aviso = (u.role === 'admin' ? '⚠️ Es un ADMINISTRADOR. ' : '')
+        + `Se eliminará el perfil de "${nombre}" del directorio. `
+        + `Nota: borra sus datos en la tienda, pero NO su acceso de inicio de sesión (eso requiere el backend de Firebase). Sus pedidos anteriores se conservan.`;
+    showConfirm(aviso, async () => {
+        try {
+            await deleteDoc(doc(db, "users", uid));
+            showToast("Cliente eliminado del directorio.", "success");
+            cargarClientes();
+        } catch (e) {
+            console.error("Error al eliminar cliente:", e);
+            showToast("No se pudo eliminar el cliente.", "error");
+        }
+    }, "Eliminar", true);
+};
 
 function exportarClientesExcel() {
     if (clientesFiltrados.length === 0) return alert("No hay clientes para exportar.");
