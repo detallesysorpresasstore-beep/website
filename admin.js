@@ -493,6 +493,7 @@ function configurarEventos() {
     document.getElementById('filtro-resenas')?.addEventListener('change', dibujarResenas);
 
     // Importador de catálogo (Excel + imágenes)
+    document.getElementById('btn-cerrar-cliente')?.addEventListener('click', () => document.getElementById('modal-cliente-detalle').classList.add('hidden'));
     document.getElementById('btn-importar-catalogo')?.addEventListener('click', abrirModalImportar);
     document.getElementById('btn-cerrar-importar')?.addEventListener('click', () => document.getElementById('modal-importar-catalogo').classList.add('hidden'));
     document.getElementById('btn-cancelar-importar')?.addEventListener('click', () => document.getElementById('modal-importar-catalogo').classList.add('hidden'));
@@ -1277,13 +1278,61 @@ function dibujarTablaClientes(arreglo) {
         const fecha = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A';
         const badgeRol = user.role === 'admin' ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">Admin</span>' : '<span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Cliente</span>';
         const telefonoTexto = user.phone ? user.phone : '<span class="text-gray-400 italic">No proporcionado</span>';
-        const accion = (user.uid && user.uid === miUid)
-            ? '<span class="text-xs text-gray-400 italic">Tú</span>'
-            : `<button onclick="eliminarCliente('${user.uid}')" title="Eliminar cliente" class="text-gray-400 hover:text-red-500 p-1"><i class="ph ph-trash text-xl"></i></button>`;
+        const btnVer = `<button onclick="verCliente('${user.uid}')" title="Ver detalle y pedidos" class="text-gray-400 hover:text-brand-blue p-1"><i class="ph ph-eye text-xl"></i></button>`;
+        const btnBorrar = (user.uid && user.uid === miUid)
+            ? '<span class="text-xs text-gray-400 italic ml-1 align-middle">Tú</span>'
+            : `<button onclick="eliminarCliente('${user.uid}')" title="Eliminar cliente" class="text-gray-400 hover:text-red-500 p-1 ml-1"><i class="ph ph-trash text-xl"></i></button>`;
+        const accion = btnVer + btnBorrar;
         htmlTemporal += `<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="p-4 font-medium text-gray-800">${sanitize(user.name || 'Sin Nombre')}</td><td class="p-4 text-gray-600">${sanitize(user.email)}</td><td class="p-4 text-gray-600">${telefonoTexto}</td><td class="p-4">${badgeRol}</td><td class="p-4 text-gray-500">${fecha}</td><td class="p-4 text-center">${accion}</td></tr>`;
     });
     tbody.innerHTML = htmlTemporal;
 }
+
+window.verCliente = (uid) => {
+    const u = clientesGlobales.find(c => c.uid === uid);
+    if (!u) return;
+    document.getElementById('cli-nombre').textContent = u.name || 'Sin nombre';
+    document.getElementById('cli-email').textContent = u.email || '—';
+    document.getElementById('cli-telefono').textContent = u.phone || 'No proporcionado';
+    document.getElementById('cli-direccion').textContent = u.address || 'No proporcionada';
+    document.getElementById('cli-rol').textContent = u.role === 'admin' ? 'Administrador' : 'Cliente';
+    document.getElementById('cli-registro').textContent = u.createdAt
+        ? new Date(u.createdAt).toLocaleDateString('es-VE', { day: '2-digit', month: 'long', year: 'numeric' })
+        : 'N/A';
+
+    // Pedidos de este cliente (por uid, con respaldo por email)
+    const emailLower = (u.email || '').toLowerCase();
+    const pedidos = pedidosGlobales.filter(p =>
+        p.clienteId === uid || (emailLower && (p.clienteEmail || '').toLowerCase() === emailLower)
+    );
+    pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    const totalGastado = pedidos.filter(p => p.estado !== 'Cancelado').reduce((s, p) => s + (p.totalUSD || 0), 0);
+    document.getElementById('cli-total-pedidos').textContent = pedidos.length;
+    document.getElementById('cli-total-gastado').textContent = '$' + totalGastado.toFixed(2);
+
+    const lista = document.getElementById('cli-pedidos-lista');
+    if (pedidos.length === 0) {
+        lista.innerHTML = '<li class="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-lg">Este cliente aún no tiene pedidos.</li>';
+    } else {
+        const colores = { Pendiente: 'bg-yellow-100 text-yellow-700', Procesando: 'bg-blue-100 text-blue-700', Enviado: 'bg-indigo-100 text-indigo-700', Entregado: 'bg-green-100 text-green-700', Cancelado: 'bg-red-100 text-red-700' };
+        lista.innerHTML = pedidos.map(p => {
+            const color = colores[p.estado] || 'bg-gray-100 text-gray-600';
+            const fecha = p.fecha ? new Date(p.fecha).toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            return `<li onclick="verPedidoDesdeCliente('${p.id}')" class="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <div><span class="font-mono text-xs text-gray-500">#${p.id.slice(-6).toUpperCase()}</span> <span class="text-xs text-gray-400 ml-1">${fecha}</span></div>
+                <div class="flex items-center gap-3"><span class="px-2 py-0.5 rounded-full text-xs font-bold ${color}">${sanitize(p.estado)}</span><span class="font-bold text-gray-800 text-sm">$${(p.totalUSD || 0).toFixed(2)}</span></div>
+            </li>`;
+        }).join('');
+    }
+    document.getElementById('modal-cliente-detalle').classList.remove('hidden');
+};
+
+// Abre el modal de pedido desde el detalle del cliente (cierra el de cliente primero)
+window.verPedidoDesdeCliente = (id) => {
+    document.getElementById('modal-cliente-detalle').classList.add('hidden');
+    abrirModalPedido(id);
+};
 
 window.eliminarCliente = (uid) => {
     const u = clientesGlobales.find(c => c.uid === uid);
